@@ -12,3 +12,17 @@ cd frontend = ng serve
 
 para levantar keycloak 
 cd bin = kc.bat start-dev
+
+
+en el archivo .env yo e utilizado el puerto 3307 adaptarlo al pueto configurado de su MySQL
+
+
+QUE ES LO QUE SE NESECITA CONFIGURAR EN KEYCLOAK 
+
+1. Manage realms = Hospital_O
+2. Clients = frontend-angular
+
+a los usuarios a crear se les nesecita otorgar los roles de rrhh jefe y admin estos tres con minusculas esto para que puedan acceder a las funcionalidades correspondientes en el sistema.
+al sistema
+
+todo esto para que coincida con el proyecto y nos salgan errores 
