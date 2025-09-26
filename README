@@ -1,0 +1,14 @@
+se nesecitan instalar las dependencias en ambas carpetas
+cd backend = npm install
+cd frontend = npm install
+cd frontend = npm install -g @angular/cli
+
+
+para levantar ambas carpetas 
+cd backend = npm run dev
+cd frontend = ng serve
+
+
+
+para levantar keycloak 
+cd bin = kc.bat start-dev
