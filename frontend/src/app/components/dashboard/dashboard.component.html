@@ -1,0 +1,101 @@
+<div class="dashboard-container" *ngIf="!loading">
+
+  <!-- Sección de estadísticas -->
+  <div class="stats-container">
+    <!-- Tarjeta de Personal Total -->
+    <div class="stat-card">
+      <div class="icon"><i class="fas fa-users"></i></div>
+      <div class="info">
+        <p>Personal Total</p>
+        <h2>{{ data.personalTotal }}</h2>
+        <small *ngIf="!hasData">Esperando datos...</small>
+      </div>
+    </div>
+
+    <!-- Tarjeta de Personal Activo -->
+    <div class="stat-card">
+      <div class="icon"><i class="fas fa-user-check"></i></div>
+      <div class="info">
+        <p>Personal Activo</p>
+        <h2>{{ data.personalActivo }}</h2>
+        <small *ngIf="!hasData">Esperando datos...</small>
+      </div>
+    </div>
+
+    <!-- Tarjeta de Personal Inactivo -->
+    <div class="stat-card">
+      <div class="icon"><i class="fas fa-user-slash"></i></div>
+      <div class="info">
+        <p>Personal Inactivo</p>
+        <h2>{{ data.personalInactivo }}</h2>
+        <small *ngIf="!hasData">Esperando datos...</small>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="icon"><i class="fas fa-calendar-day"></i></div>
+      <div class="info">
+        <p>Turnos de Hoy</p>
+        <h2>{{ data.turnosHoy }}</h2>
+        <small *ngIf="!hasData">Sin datos aún</small>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+      <div class="info">
+        <p>Alertas</p>
+        <h2>{{ data.alertas }}</h2>
+        <small *ngIf="!hasData">No hay alertas registradas</small>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="icon"><i class="fas fa-users-cog"></i></div>
+      <div class="info">
+        <p>Jerarquías</p>
+        <h2>{{ data.jerarquias }}</h2>
+        <small *ngIf="!hasData">Configuración no cargada</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contenido inferior (se mantiene igual) -->
+  <div class="bottom-section">
+    
+    <!-- Gráfico de asistencia semanal -->
+    <div class="chart-container">
+      <h3>Asistencia Semanal</h3>
+      <div *ngIf="!hasData" class="no-data">
+        <p>No hay datos de asistencia disponibles</p>
+      </div>
+      <canvas id="asistenciaChart" *ngIf="hasData"></canvas>
+    </div>
+
+    <!-- Próximos turnos -->
+    <div class="turnos-container">
+      <h3>Próximos Turnos</h3>
+      <div *ngIf="!hasData" class="no-data">
+        <p>No hay turnos programados</p>
+      </div>
+      <div *ngIf="hasData">
+        <div class="turno">
+          <strong>Mañana:</strong> {{ data.proximosTurnos.manana.enfermeros }} Enfermeros,
+          {{ data.proximosTurnos.manana.medicos }} Médicos
+        </div>
+        <div class="turno">
+          <strong>Tarde:</strong> {{ data.proximosTurnos.tarde.enfermeros }} Enfermeros,
+          {{ data.proximosTurnos.tarde.medicos }} Médicos
+        </div>
+        <div class="turno">
+          <strong>Noche:</strong> {{ data.proximosTurnos.noche.enfermeros }} Enfermeros,
+          {{ data.proximosTurnos.noche.medicos }} Médicos
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="loading" class="loading">
+  <p>Cargando datos del biométrico...</p>
+</div>
