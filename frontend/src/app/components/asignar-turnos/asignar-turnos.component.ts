@@ -128,9 +128,15 @@ export class AsignarTurnosComponent implements OnInit {
     tolerancia_salida_minutos: 15
   };
 
-  get turnosDisponibles(): Turno[] {
-    return this.turnos;
-  }
+get turnosDisponibles(): Turno[] {
+  return this.turnos.filter(turno => 
+    turno && 
+    turno.nombre && 
+    turno.nombre.trim() !== '' && 
+    turno.hora_inicio && 
+    turno.hora_fin
+  );
+}
 
   get enfermerosEquipoSeleccionados() {
   return this.equipoCompleto.filter(e => this.getTipoRolPorNombre(e.rol_id) === 'ENFERMERO');
@@ -168,6 +174,7 @@ export class AsignarTurnosComponent implements OnInit {
   // ===== Ciclo de vida =====
   ngOnInit(): void {
     this.cargarCatalogos();
+    this.limpiarTurnosCorruptos();
   }
 
     private cargarCatalogos() {
@@ -406,35 +413,52 @@ export class AsignarTurnosComponent implements OnInit {
     );
   }
 
-  crearTurnoPersonalizado() {
-    if (!this.nuevoTurno.nombre || !this.nuevoTurno.hora_inicio || !this.nuevoTurno.hora_fin) {
-      this.error = "Debes completar nombre, hora de inicio y hora de fin para crear el turno.";
-      return;
-    }
-
-    this.turnosDisponibles.push({
-      ...this.nuevoTurno,
-      esPersonalizado: true,
-      id: 0,
-      minutos_descanso: 0,
-      cruza_medianoche: false
-    });
-
-    this.limpiarTurnos(); // 🔹 actualizar lista limpia
-
-    this.nuevoTurno = {
-      nombre: '',
-      hora_inicio: '',
-      hora_fin: '',
-      tolerancia_entrada_minutos: 15,
-      tolerancia_salida_minutos: 15
-    };
+crearTurnoPersonalizado() {
+  if (!this.nuevoTurno.nombre || !this.nuevoTurno.hora_inicio || !this.nuevoTurno.hora_fin) {
+    this.error = "Debes completar nombre, hora de inicio y hora de fin para crear el turno.";
+    return;
   }
 
-
-
-
+  // Generar un ID único para el turno personalizado
+  const nuevoId = Math.max(0, ...this.turnos.map(t => t.id || 0)) + 1;
   
+  const turnoPersonalizado: Turno = {
+    ...this.nuevoTurno,
+    id: nuevoId,
+    minutos_descanso: 0,
+    cruza_medianoche: false,
+    esPersonalizado: true
+  };
+
+  this.turnos.push(turnoPersonalizado);
+  
+  // Limpiar el formulario
+  this.nuevoTurno = {
+    nombre: '',
+    hora_inicio: '08:00',
+    hora_fin: '16:00',
+    tolerancia_entrada_minutos: 15,
+    tolerancia_salida_minutos: 15
+  };
+
+  this.info = 'Turno personalizado creado correctamente';
+  
+  // Guardar en localStorage
+  this.guardarTurnosEnLocalStorage();
+}
+
+
+private limpiarTurnosCorruptos() {
+  this.turnos = this.turnos.filter(turno => 
+    turno && 
+    turno.id && 
+    turno.nombre && 
+    turno.nombre.trim() !== '' && 
+    turno.hora_inicio && 
+    turno.hora_fin
+  );
+  this.guardarTurnosEnLocalStorage();
+}
 
   private guardarTurnosEnLocalStorage() {
     const personalizados = this.turnos.filter(t => t.esPersonalizado);
