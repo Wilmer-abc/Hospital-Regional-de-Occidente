@@ -226,7 +226,7 @@
         </div>
 
         <!-- Asignacion de turnos por empleado -->
-        <h4>Asignar turnos al equipo</h4>
+        <!-- <h4>Asignar turnos al equipo</h4>
         <div *ngFor="let emp of equipoCompleto" class="asignacion-turno">
           <div class="empleado-info">
             <strong>{{ emp.nombre_completo }}</strong>
@@ -238,7 +238,7 @@
               {{ turno.nombre }} ({{ turno.hora_inicio }} - {{ turno.hora_fin }})
             </option>
           </select>
-        </div>
+        </div> -->
 
         <div class="actions">
           <button class="btn outline" (click)="prevStep()">Atrás</button>
@@ -247,68 +247,49 @@
       </section>
 
       <!-- Paso 4: Fechas y descansos -->
+      <!-- Paso 4: Fechas y descansos -->
       <section *ngIf="step===4" class="form-section">
-        <h3>4) Fechas y días de descanso</h3>
-        
+        <h3>4) Asignación individual de turnos por fecha</h3>
+
         <div class="grid">
           <label>Fecha inicio
-            <input type="date" [formControl]="fechasForm.controls.fecha_inicio" 
-                   (change)="generarPreviewFechas()">
+            <input type="date" [formControl]="fechasForm.controls.fecha_inicio">
           </label>
           <label>Fecha fin
-            <input type="date" [formControl]="fechasForm.controls.fecha_fin"
-                   (change)="generarPreviewFechas()">
+            <input type="date" [formControl]="fechasForm.controls.fecha_fin">
           </label>
-          <label>Patrón de trabajo
-            <select [formControl]="fechasForm.controls.patron" (change)="generarPreviewFechas()">
-              <option value="NORMAL">Normal (5x2)</option>
-              <option value="24x72">24×72</option>
-              <option value="12x36">12×36</option>
+        </div>
+
+        <div class="selector-empleado" *ngIf="equipoCompleto.length > 0">
+          <label>Seleccionar empleado:
+            <select [(ngModel)]="empleadoCalendarioSeleccionado">
+              <option [ngValue]="null">-- Seleccionar empleado --</option>
+              <option *ngFor="let emp of equipoCompleto" [ngValue]="emp.id">
+                {{ emp.nombre_completo }} - {{ getRolNombre(emp.rol_id) }}
+              </option>
             </select>
           </label>
         </div>
 
-        <!-- Previsualizacion de fechas -->
-        <div class="preview" *ngIf="previewFechas.length > 0">
-          <h4>Previsualización ({{ previewFechas.length }} días laborables)</h4>
-          <div class="dates">
-            <span *ngFor="let f of previewFechas.slice(0, 10)" class="date">{{ f }}</span>
-            <span *ngIf="previewFechas.length > 10" class="more">... y {{ previewFechas.length - 10 }} más</span>
-          </div>
-        </div>
-
-        <!-- Gestion de reemplazos -->
-        <div class="reemplazos-section">
-          <h4>Gestión de reemplazos</h4>
-          <p class="muted">Configure reemplazos para empleados que no puedan asistir</p>
-          <button class="btn outline" (click)="agregarReemplazo()">+ Agregar reemplazo</button>
-          
-          <div *ngFor="let reemplazo of reemplazos" class="reemplazo-card"> 
-            <label>Empleado a reemplazar:
-              <select [(ngModel)]="reemplazo.empleadoId">
-                <option *ngFor="let emp of equipoCompleto" [ngValue]="emp.id">{{ emp.nombre_completo }}</option>
-              </select>
-            </label>
-            <label>Fecha inicio: <input type="date" [(ngModel)]="reemplazo.fechaInicio"></label>
-            <label>Fecha fin: <input type="date" [(ngModel)]="reemplazo.fechaFin"></label>
-            
-            <!-- Agregar boton para buscar reemplazo -->
-            <button class="btn small" (click)="buscarReemplazo(reemplazo)">Buscar reemplazo</button>
-            
-            <!-- Mostrar reemplazo asignado si existe -->
-            <div *ngIf="reemplazo.reemplazoId" class="reemplazo-asignado">
-              Reemplazo: {{ getEmpleadoNombre(reemplazo.reemplazoId) }}
-            </div>
-            
-            <button class="btn small danger" (click)="eliminarReemplazo(reemplazo)">Eliminar</button>
-          </div>
-        </div>
+        <!-- Aquí se incrusta el componente hijo -->
+        <app-calendario-turnos
+          *ngIf="empleadoCalendarioSeleccionado"
+          [empleadoId]="empleadoCalendarioSeleccionado!"
+          [equipo]="equipoCompleto"
+          [turnosDisponibles]="turnosDisponibles"
+          [fechaInicio]="fechasForm.controls.fecha_inicio.value || ''"
+          [fechaFin]="fechasForm.controls.fecha_fin.value || ''"
+          (asignacionesGuardadas)="recibirAsignaciones($event)"
+           (turnoAsignado)="recibirAsignaciones($event)">>
+        </app-calendario-turnos>
+        
 
         <div class="actions">
           <button class="btn outline" (click)="prevStep()">Atrás</button>
-          <button class="btn" (click)="guardarFormulario()">Guardar</button>
+          <button class="btn" (click)="guardarFormulario()">Guardar y Finalizar</button>
         </div>
       </section>
+
     </ng-container>
 
     <!--  FIJOS  -->
