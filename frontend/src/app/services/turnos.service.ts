@@ -61,7 +61,7 @@ export interface ApiResponse<T = any> {
 
 @Injectable({ providedIn: 'root' })
 export class TurnosService {
-  API: any;
+   private API = `${environment.apiBase}/turnos`;
 
 guardarAsignaciones(payload: { asignaciones: any[] }): Observable<any> {
   const token = this.authService.getToken(); // o como obtengas tu token
@@ -107,8 +107,8 @@ guardarAsignaciones(payload: { asignaciones: any[] }): Observable<any> {
 
 
   //  Turnos 
-  getTurnos(): Observable<ApiResponse<Turno[]>> {
-    return this.http.get<ApiResponse<Turno[]>>(`${this.base}/turnos`);
+ getTurnos() {
+    return this.http.get<any>(this.API);
   }
 
   createTurno(body: Partial<Turno> & { nombre?: string }) {
@@ -251,5 +251,13 @@ getCalendarioEmpleado(empleadoId: number, mes: number, anio: number): Observable
     `${this.base}/asignaciones/empleado/${empleadoId}/calendario?mes=${mes}&año=${anio}`
   );
 }
+
+crearTurno(turno: any) {
+    return this.http.post<any>(this.API, turno);
+  }
+
+  eliminarTurno(id: number) {
+    return this.http.delete<any>(`${this.API}/${id}`); 
+  }
 
 }
