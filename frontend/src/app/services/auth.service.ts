@@ -4,9 +4,21 @@ import { from, of, map, Observable } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  getToken() {
-      throw new Error('Method not implemented.');
+   constructor(private keycloakService: KeycloakService) {}
+
+
+   async getToken(): Promise<string | null> {
+    try {
+      const token = await this.keycloakService.getToken();
+      return token || null;
+    } catch (err) {
+      console.error('❌ Error obteniendo token:', err);
+      return null;
+    }
   }
+  // getToken() {
+  //     throw new Error('Method not implemented.');
+  // }
   logoutLocal() {
       throw new Error('Method not implemented.');
   }
