@@ -1,17 +1,23 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { AuthService } from './auth.service';
 
 export interface Turno {
   id: number;
   nombre_turno: string;
   hora_inicio: string;
+  tipo: 'FIJO' | 'ROTATIVO' | '24x72' | '12x36' | 'PERSONALIZADO';
   hora_fin: string;
   minutos_descanso: number;
   tolerancia_entrada_minutos: number;
   tolerancia_salida_minutos: number;
   cruza_medianoche: boolean;
+  duracion_horas: number;
+  dias_trabajo: number[];
+  dias_descanso: number[];
+  color?: string;
 }
 
 export interface Asignacion {
@@ -25,6 +31,25 @@ export interface Asignacion {
   hora_inicio: string;
   hora_fin: string;
   cruza_medianoche: boolean;
+  fecha_inicio: string;
+  fecha_fin: string;
+  tipo_turno: string;
+  estado: 'ACTIVO' | 'PENDIENTE' | 'COMPLETADO' | 'CANCELADO';
+  reemplazo_id?: number;
+  motivo_reemplazo?: string;
+  creado_en: string;
+
+}
+
+export interface DiaTrabajo {
+  fecha: string;
+  empleado_id: number;
+  turno_id: number;
+  hora_entrada: string;
+  hora_salida: string;
+  necesita_reemplazo: boolean;
+  reemplazo_id?: number;
+  estado: string;
 }
 
 export interface ApiResponse<T = any> {
@@ -36,12 +61,28 @@ export interface ApiResponse<T = any> {
 
 @Injectable({ providedIn: 'root' })
 export class TurnosService {
+  API: any;
+
+guardarAsignaciones(payload: { asignaciones: any[] }): Observable<any> {
+  const token = this.authService.getToken(); // o como obtengas tu token
+  const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
+
+  return this.http.post<any>(
+    `${this.base}/asignaciones/bulk`,
+    payload,
+    { headers }
+  );
+}
+
   getEmpleadosDisponibles(desde: string, hasta: string, arg2: string | undefined) {
     throw new Error('Method not implemented.');
   }
   private base = environment.apiBase; //ej. http://localhost:3000/api
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private authService: AuthService // 👈 tú debes tener algo así
+  ) {}
 
   //  helpers 
   // Normaliza el payload que espera el backend (nombre_turno en vez de nombre)
@@ -56,6 +97,14 @@ export class TurnosService {
       cruza_medianoche: !!body.cruza_medianoche,
     };
   }
+
+  // turnos.service.ts
+// turnos.service.ts
+  getTurnosDisponibles(): Observable<any> {
+    return this.http.get<any>(`${this.API}/turnos`);
+  }
+
+
 
   //  Turnos 
   getTurnos(): Observable<ApiResponse<Turno[]>> {
@@ -81,29 +130,30 @@ export class TurnosService {
   }
 
 
-  getCandidatosJefe(areaId: number): Observable<ApiResponse<any[]>> {
-  return this.http.get<ApiResponse<any[]>>(
-    `${this.base}/areas/${areaId}/candidatos-jefe`
-  );
-}
+    getCandidatosJefe(areaId: number): Observable<ApiResponse<any[]>> {
+    return this.http.get<ApiResponse<any[]>>(
+      `${this.base}/areas/${areaId}/candidatos-jefe`
+    );
+  }
 
 
   // turnos.service.ts
-getDisponibles(desde: string, hasta: string, areaId?: number, rol?: string, q?: string) {
-  let params = new HttpParams()
-    .set('desde', desde)
-    .set('hasta', hasta);
+  getDisponibles(desde: string, hasta: string, areaId?: number, rol?: string, q?: string) {
+    let params = new HttpParams()
+      .set('desde', desde)
+      .set('hasta', hasta);
 
-  if (areaId) params = params.set('areaId', areaId);
-  if (rol) params = params.set('rol', rol);
-  if (q) params = params.set('q', q);
+    if (areaId) params = params.set('areaId', areaId);
+    if (rol) params = params.set('rol', rol);
+    if (q) params = params.set('q', q);
 
-  return this.http.get<ApiResponse<any[]>>(`${this.base}/asignaciones/disponibles`, { params });
-}
+    return this.http.get<ApiResponse<any[]>>(`${this.base}/asignaciones/disponibles`, { params });
+  }
 
-
-
-
+  // En turnos.service.ts
+  crearTurnoSiNoExiste(turnoData: any): Observable<ApiResponse> {
+    return this.http.post<ApiResponse>(`${this.base}/turnos`, turnoData);
+  }
 
   // NUEVO: Verificar si un turno puede ser eliminado
   canDeleteTurno(id: number): Observable<ApiResponse<{ can_delete: boolean; asignaciones_count: number }>> {
@@ -146,4 +196,60 @@ getDisponibles(desde: string, hasta: string, areaId?: number, rol?: string, q?: 
   }) {
     return this.http.post<ApiResponse>(`${this.base}/asignaciones/lote`, body);
   }
+
+  // Nuevos métodos para gestión de turnos rotativos
+  generarCalendarioRotativo(body: {
+    empleados_ids: number[];
+    fecha_inicio: string;
+    fecha_fin: string;
+    tipo_turno: '24x72' | '12x36' | 'PERSONALIZADO';
+    configuracion_personalizada?: any;
+  }): Observable<ApiResponse<{ calendario: DiaTrabajo[] }>> {
+    return this.http.post<ApiResponse<{ calendario: DiaTrabajo[] }>>(
+      `${this.base}/asignaciones/generar-calendario`,
+      body
+    );
+  }
+
+  asignarTurnosRotativos(body: {
+    empleados_ids: number[];
+    fecha_inicio: string;
+    fecha_fin: string;
+    tipo_turno: string;
+    dias_trabajo: number[];
+    dias_descanso: number[];
+    turno_config_id: number;
+  }): Observable<ApiResponse<{ asignaciones: Asignacion[] }>> {
+    return this.http.post<ApiResponse<{ asignaciones: Asignacion[] }>>(
+      `${this.base}/asignaciones/rotativos`,
+      body
+    );
+  }
+
+  getEmpleadosDisponiblesParaReemplazo(fecha: string, turno_id: number): Observable<ApiResponse<any[]>> {
+    return this.http.get<ApiResponse<any[]>>(
+      `${this.base}/asignaciones/reemplazos/disponibles`,
+      { params: { fecha, turno_id: turno_id.toString() } }
+    );
+  }
+
+  solicitarReemplazo(body: {
+    dia_trabajo_id: number;
+    empleado_original_id: number;
+    empleado_reemplazo_id: number;
+    motivo: string;
+  }): Observable<ApiResponse> {
+    return this.http.post<ApiResponse>(`${this.base}/asignaciones/reemplazos/solicitar`, body);
+  }
+
+  confirmarReemplazo(reemplazo_id: number): Observable<ApiResponse> {
+    return this.http.put<ApiResponse>(`${this.base}/asignaciones/reemplazos/${reemplazo_id}/confirmar`, {});
+  }
+
+getCalendarioEmpleado(empleadoId: number, mes: number, anio: number): Observable<any> {
+  return this.http.get<any>(
+    `${this.base}/asignaciones/empleado/${empleadoId}/calendario?mes=${mes}&año=${anio}`
+  );
+}
+
 }
