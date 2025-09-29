@@ -10,6 +10,7 @@ const API = environment.apiBase;
 
 // ===== Interfaces =====
 interface Turno {
+  nombre_turno: string;
   id: number;
   nombre: string;
   hora_inicio: string;
@@ -128,15 +129,17 @@ export class AsignarTurnosComponent implements OnInit {
     tolerancia_salida_minutos: 15
   };
 
-get turnosDisponibles(): Turno[] {
-  return this.turnos.filter(turno => 
-    turno && 
-    turno.nombre && 
-    turno.nombre.trim() !== '' && 
-    turno.hora_inicio && 
-    turno.hora_fin
-  );
-}
+// Reemplaza el getter turnosDisponibles por este:
+  get turnosDisponibles(): Turno[] {
+    // Filtrar turnos válidos y ordenarlos
+    return this.turnos
+      .filter(t => t && t.nombre && t.hora_inicio && t.hora_fin)
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }
+
+
+
+
 
   get enfermerosEquipoSeleccionados() {
   return this.equipoCompleto.filter(e => this.getTipoRolPorNombre(e.rol_id) === 'ENFERMERO');
@@ -174,15 +177,41 @@ get turnosDisponibles(): Turno[] {
   // ===== Ciclo de vida =====
   ngOnInit(): void {
     this.cargarCatalogos();
-    this.limpiarTurnosCorruptos();
+    this.cargarTurnos();
+    
+  }
+
+  // 🔹 Cargar turnos desde DB
+   cargarTurnos() {
+    this.http.get<any>(`${API}/turnos`).subscribe({
+      next: (res) => {
+        const turnosDB: Turno[] = res.data || res || [];
+        this.turnos = turnosDB.map(t => ({
+          id: t.id,
+          nombre: t.nombre || t.nombre_turno,
+          nombre_turno: t.nombre_turno || t.nombre || '',
+          hora_inicio: t.hora_inicio,
+          hora_fin: t.hora_fin,
+          minutos_descanso: t.minutos_descanso ?? 0,
+          tolerancia_entrada_minutos: t.tolerancia_entrada_minutos,
+          tolerancia_salida_minutos: t.tolerancia_salida_minutos,
+          cruza_medianoche: t.cruza_medianoche ?? false,
+          esPersonalizado: true // 🔥 Marcar todos como personalizados para poder eliminarlos
+        }));
+      },
+      error: (err) => console.error('Error cargando turnos:', err)
+    });
   }
 
     private cargarCatalogos() {
     this.loading = true;
     this.error = null;
 
+    // En cargarCatalogos(), modifica esta parte:
     const turnosGuardados = localStorage.getItem('turnosPersonalizados');
     const turnosPersonalizados = turnosGuardados ? JSON.parse(turnosGuardados) : [];
+    // La asignación de this.turnos se realiza dentro del .then donde 't' está definido.
+    console.log('Turnos personalizados cargados:', turnosPersonalizados);
 
     Promise.all([
       this.http.get<any>(`${API}/turnos`).toPromise(),
@@ -419,56 +448,73 @@ crearTurnoPersonalizado() {
     return;
   }
 
-  // Generar un ID único para el turno personalizado
-  const nuevoId = Math.max(0, ...this.turnos.map(t => t.id || 0)) + 1;
-  
-  const turnoPersonalizado: Turno = {
-    ...this.nuevoTurno,
-    id: nuevoId,
-    minutos_descanso: 0,
-    cruza_medianoche: false,
-    esPersonalizado: true
+  const nuevo = {
+    nombre: this.nuevoTurno.nombre,
+    hora_inicio: this.nuevoTurno.hora_inicio,
+    hora_fin: this.nuevoTurno.hora_fin,
+    tolerancia_entrada_minutos: this.nuevoTurno.tolerancia_entrada_minutos ?? 15,
+    tolerancia_salida_minutos: this.nuevoTurno.tolerancia_salida_minutos ?? 15
   };
 
-  this.turnos.push(turnoPersonalizado);
-  
-  // Limpiar el formulario
-  this.nuevoTurno = {
-    nombre: '',
-    hora_inicio: '08:00',
-    hora_fin: '16:00',
-    tolerancia_entrada_minutos: 15,
-    tolerancia_salida_minutos: 15
-  };
-
-  this.info = 'Turno personalizado creado correctamente';
-  
-  // Guardar en localStorage
-  this.guardarTurnosEnLocalStorage();
-}
-
-
-private limpiarTurnosCorruptos() {
-  this.turnos = this.turnos.filter(turno => 
-    turno && 
-    turno.id && 
-    turno.nombre && 
-    turno.nombre.trim() !== '' && 
-    turno.hora_inicio && 
-    turno.hora_fin
-  );
-  this.guardarTurnosEnLocalStorage();
+  this.http.post<any>(`${API}/turnos`, nuevo).subscribe({
+    next: (res) => {
+      const turnoGuardado = res.data;
+      
+      // 🔥 SOLUCIÓN: Agregar el turno con esPersonalizado: true
+      this.turnos.push({
+        ...turnoGuardado,
+        id: turnoGuardado.id,
+        nombre: turnoGuardado.nombre || turnoGuardado.nombre_turno,
+        hora_inicio: turnoGuardado.hora_inicio,
+        hora_fin: turnoGuardado.hora_fin,
+        tolerancia_entrada_minutos: turnoGuardado.tolerancia_entrada_minutos,
+        tolerancia_salida_minutos: turnoGuardado.tolerancia_salida_minutos,
+        minutos_descanso: turnoGuardado.minutos_descanso || 0,
+        cruza_medianoche: turnoGuardado.cruza_medianoche || false,
+        esPersonalizado: true // 🔥 ESTA ES LA CLAVE
+      });
+      
+      this.info = 'Turno creado correctamente';
+      this.nuevoTurno = { 
+        nombre: '', 
+        hora_inicio: '08:00', 
+        hora_fin: '16:00', 
+        tolerancia_entrada_minutos: 15, 
+        tolerancia_salida_minutos: 15 
+      };
+    },
+    error: (err) => {
+      console.error('Error guardando turno:', err);
+      this.error = 'Error al crear el turno';
+    }
+  });
 }
 
   private guardarTurnosEnLocalStorage() {
     const personalizados = this.turnos.filter(t => t.esPersonalizado);
     localStorage.setItem('turnosPersonalizados', JSON.stringify(personalizados));
+    console.log('Turnos guardados en localStorage:', personalizados);
   }
 
-  eliminarTurno(turnoId: number) {
-    this.turnos = this.turnos.filter(t => t.id !== turnoId);
-    this.guardarTurnosEnLocalStorage();
+  eliminarTurno(id: number) {
+    if (!confirm('¿Estás seguro de que quieres eliminar este turno?')) {
+      return;
+    }
+
+    this.http.delete<any>(`${API}/turnos/${id}`).subscribe({
+      next: () => {
+        // Eliminar de la lista local
+        this.turnos = this.turnos.filter(t => t.id !== id);
+        this.info = 'Turno eliminado correctamente';
+      },
+      error: (err) => {
+        console.error('Error eliminando turno:', err);
+        this.error = 'No se pudo eliminar el turno';
+      }
+    });
   }
+
+
 
   // ===== Reemplazos =====
   agregarReemplazo() {
@@ -503,6 +549,10 @@ private limpiarTurnosCorruptos() {
       this.guardarTurnosFijos();
     }
   }
+
+  guardarTurnoEnDB(turno: Turno) {
+  return this.http.post<Turno>(`${API}/turnos`, turno);
+}
 
   private guardarConfiguracionRotativo() {
     const conf = {
