@@ -58,6 +58,46 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Obtener turnos con sus empleados asignados en un rango
+router.get('/con-empleados', async (req, res) => {
+  const { desde, hasta } = req.query;
+  if (!desde || !hasta) {
+    return res.status(400).json({ success: false, message: 'Faltan fechas desde/hasta' });
+  }
+
+  try {
+    const [rows] = await db.query(`
+      SELECT t.id AS turno_id, t.nombre_turno, t.hora_inicio, t.hora_fin,
+             e.id AS empleado_id, e.nombre_completo, a.fecha_inicio, a.fecha_fin
+      FROM turnos t
+      LEFT JOIN asignacion_turnos a ON a.turno_id = t.id
+      LEFT JOIN empleados e ON e.id = a.empleado_id
+      WHERE (a.fecha_inicio <= ? AND a.fecha_fin >= ?)
+      ORDER BY t.id, e.nombre_completo
+    `, [hasta, desde]);
+
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Error obteniendo turnos con empleados', error: err.message });
+  }
+});
+
+router.get('/activos-hoy', async (_req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT DISTINCT t.id, t.nombre_turno, t.hora_inicio, t.hora_fin
+      FROM turnos t
+      JOIN asignacion_turnos a ON a.turno_id = t.id
+      WHERE CURDATE() BETWEEN a.fecha_inicio AND a.fecha_fin
+    `);
+
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Error obteniendo turnos activos', error: err.message });
+  }
+});
+
+
 // Actualizar un turno
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
