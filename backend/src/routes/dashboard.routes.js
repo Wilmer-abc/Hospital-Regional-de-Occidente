@@ -66,7 +66,7 @@ router.get('/summary', requireAuth, requireRRHHorJefe, async (_req, res) => {
 
     // 4) Turnos hoy
     const [[{ c: turnosHoy }]] = await db.query(
-      'SELECT COUNT(*) AS c FROM asignacion_turnos WHERE fecha = CURDATE()'
+      'SELECT COUNT(*) AS c FROM asignacion_turnos WHERE CURDATE() BETWEEN fecha_inicio AND fecha_fin'
     );
 
     // 5) Alertas pendientes
@@ -88,7 +88,7 @@ router.get('/summary', requireAuth, requireRRHHorJefe, async (_req, res) => {
       JOIN turnos t ON t.id = at.turno_id
       JOIN empleados e ON e.id = at.empleado_id
       LEFT JOIN roles_empleado re ON re.id = e.rol_id
-      WHERE at.fecha = DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+      WHERE DATE_ADD(CURDATE(), INTERVAL 1 DAY) BETWEEN at.fecha_inicio AND at.fecha_fin
       AND e.eliminado_en IS NULL
     `);
 
