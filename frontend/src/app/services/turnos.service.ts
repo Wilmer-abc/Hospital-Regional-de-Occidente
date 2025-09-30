@@ -42,6 +42,7 @@ export interface Asignacion {
 }
 
 export interface DiaTrabajo {
+  fecha_inicio: string;
   fecha: string;
   empleado_id: number;
   turno_id: number;
