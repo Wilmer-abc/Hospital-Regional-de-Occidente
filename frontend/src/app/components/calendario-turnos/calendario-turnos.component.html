@@ -8,13 +8,15 @@
     </div>
     
     <!-- Botón para guardar asignaciones -->
-    <div class="acciones-calendario">
-      <button class="btn-primario" 
-              [disabled]="asignacionesPendientes.length === 0"
-              (click)="guardarAsignaciones()">
-        Guardar asignaciones ({{ asignacionesPendientes.length }})
-      </button>
-    </div>
+      <div class="acciones-calendario">
+        <button class="btn-guardar-moderno" 
+                [disabled]="asignacionesPendientes.length === 0"
+                (click)="guardarAsignaciones()">
+          <span class="btn-icon">💾</span>
+          Guardar asignaciones 
+          <span class="btn-badge">{{ asignacionesPendientes.length }}</span>
+        </button>
+      </div>
   </div>
 
   <!-- Días de la semana -->
