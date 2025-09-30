@@ -1,3 +1,4 @@
+// calendario-turnos.component.ts
 import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -67,7 +68,6 @@ export class CalendarioTurnosComponent implements OnInit {
     return this.meses[this.mesActual];
   }
 
-  // CAMBIADO: Método público para usar en el template
   getNombreEmpleado(empleadoId: number): string {
     const empleado = this.equipo.find(e => e.id === empleadoId);
     return empleado ? empleado.nombre_completo : 'Empleado';
@@ -144,32 +144,9 @@ export class CalendarioTurnosComponent implements OnInit {
           },
           error: (error) => {
             console.error('Error cargando asignaciones:', error);
-            this.cargarDatosEjemplo();
           }
         });
-    } else {
-      this.cargarDatosEjemplo();
-    }
-  }
-
-  private cargarDatosEjemplo() {
-    // Datos de ejemplo para testing
-    const hoy = new Date();
-    const fechaEjemplo = hoy.toISOString().split('T')[0];
-    
-    const dia = this.diasCalendario.find(d => d.fecha === fechaEjemplo);
-    if (dia) {
-      dia.asignaciones = [{
-        fecha: fechaEjemplo,
-        empleado_id: this.empleadoId || 1,
-        turno_id: 1,
-        hora_entrada: '08:00',
-        hora_salida: '16:00',
-        necesita_reemplazo: false,
-        estado: 'ASIGNADO',
-        nombreEmpleado: 'Empleado Ejemplo'
-      }];
-    }
+    } 
   }
 
   private procesarAsignaciones(asignaciones: DiaTrabajo[]) {
@@ -178,7 +155,8 @@ export class CalendarioTurnosComponent implements OnInit {
     });
 
     asignaciones.forEach(asignacion => {
-      const dia = this.diasCalendario.find(d => d.fecha === asignacion.fecha);
+      // 🔹 Usar fecha_inicio para mapear en calendario
+      const dia = this.diasCalendario.find(d => d.fecha === asignacion.fecha_inicio);
       if (dia) {
         dia.asignaciones.push({
           ...asignacion,
@@ -199,10 +177,6 @@ export class CalendarioTurnosComponent implements OnInit {
     }
   }
 
-  aplicarFiltro(filtro: string) {
-    this.filtroActivo = filtro;
-  }
-
   abrirModalAsignacion(fecha: string) {
     this.fechaSeleccionada = fecha;
     this.empleadoSeleccionado = this.empleadoId;
@@ -218,9 +192,10 @@ export class CalendarioTurnosComponent implements OnInit {
         return;
       }
 
-
       const nuevaAsignacion = {
-        fecha: this.fechaSeleccionada,
+        fecha_inicio: this.fechaSeleccionada,  
+        fecha_fin: this.fechaSeleccionada,     
+        fecha: this.fechaSeleccionada,         
         empleado_id: this.empleadoId,
         turno_id: this.turnoSeleccionado,
         hora_entrada: turnoSeleccionado.hora_inicio,
@@ -246,90 +221,47 @@ export class CalendarioTurnosComponent implements OnInit {
     }
   }
 
-  cargarDatos() { 
-    this.cargarTurnosDisponibles(); 
-    this.cargarAsignaciones(); 
-  } 
-
-  cargarTurnosDisponibles() {
-    if (this.turnosDisponibles.length === 0) {
-      this.turnosService.getTurnosDisponibles().subscribe({
-        next: (response) => {
-          if (response.success) {
-            this.turnosDisponibles = response.data || [];
-          }
-        },
-        
-      });
-    }
-  }
-
-    validarTurnosAntesDeGuardar(): boolean {
-    const turnosIdsUsados = [...new Set(this.asignacionesPendientes.map(a => a.turno_id))];
-    const turnosExistentesIds = this.turnosDisponibles.map(t => t.id);
-    
-    const turnosInvalidos = turnosIdsUsados.filter(id => !turnosExistentesIds.includes(id));
-    
-    if (turnosInvalidos.length > 0) {
-      console.error('Turnos inválidos detectados:', turnosInvalidos);
-      alert(`Los siguientes turnos no existen: ${turnosInvalidos.join(', ')}`);
-      return false;
-    }
-    
-    return true;
-  }
-
-// En calendario-turnos.component.ts
-
   guardarAsignaciones() {
-  if (this.asignacionesPendientes.length === 0) {
-    alert('No hay asignaciones pendientes para guardar');
-    return;
-  }
+    if (this.asignacionesPendientes.length === 0) {
+      alert('No hay asignaciones pendientes para guardar');
+      return;
+    }
 
-  console.log('📌 Asignaciones pendientes antes de enviar:', this.asignacionesPendientes);
+    console.log('Asignaciones pendientes antes de enviar:', this.asignacionesPendientes);
 
-  // 🔹 Armar array de asignaciones para el backend
-  const payload = {
+    const payload = {
       asignaciones: this.asignacionesPendientes.map(a => ({
         empleado_id: a.empleado_id,
         turno_id: a.turno_id,
-        fecha: a.fecha
+        fecha_inicio: a.fecha_inicio,  
+        fecha_fin: a.fecha_fin        
       }))
     };
 
-  console.log('📤 Payload que se enviará al backend:', payload);
+    console.log('Payload que se enviará al backend:', payload);
 
-  this.turnosService.guardarAsignaciones(payload).subscribe({
-    next: (res) => {
-      if (res.success) {
-        alert('✅ Asignaciones guardadas correctamente en el servidor');
-        this.asignacionesPendientes = [];
-        this.asignacionesGuardadas.emit(this.asignacionesPendientes);
-      } else {
-        alert(`⚠️ Error del servidor: ${res.message}`);
+    this.turnosService.guardarAsignaciones(payload).subscribe({
+      next: (res) => {
+        if (res.success) {
+          alert(' Asignaciones guardadas correctamente');
+          this.asignacionesPendientes = [];
+          this.asignacionesGuardadas.emit(this.asignacionesPendientes);
+        } else {
+          alert(`Error del servidor: ${res.message}`);
+        }
+      },
+      error: (err) => {
+        console.error('Error guardando asignaciones en servidor:', err);
+
+        if (err.status === 400) {
+          alert(`Error de validación: ${err.error.message}. Turnos inválidos: ${err.error.turnosInvalidos}`);
+        } else if (err.status === 401) {
+          alert('Error de autenticación. Por favor, inicie sesión nuevamente.');
+        } else {
+          alert('Error inesperado. Revise la consola.');
+        }
       }
-    },
-    error: (err) => {
-      console.error('❌ Error guardando asignaciones en servidor:', err);
-
-      if (err.status === 400) {
-        alert(`Error de validación: ${err.error.message}. Turnos inválidos: ${err.error.turnosInvalidos}`);
-      } else if (err.status === 401) {
-        alert('Error de autenticación. Por favor, inicie sesión nuevamente.');
-      } else {
-        alert('Error inesperado. Revise la consola.');
-      }
-    }
-  });
-}
-
-
-  guardarEnLocalStorageComoRespaldo() {
-    throw new Error('Method not implemented.');
-  }
-  guardarAsignacionesEnLocalStorage() {
-    throw new Error('Method not implemented.');
+    });
   }
 
   cerrarModal() {
