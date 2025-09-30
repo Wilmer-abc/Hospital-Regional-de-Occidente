@@ -149,7 +149,7 @@
             </button>
           </div>
 
-        <!-- Lista de empleados disponibles -->
+        <!-- En la lista de empleados disponibles, actualiza esta parte: -->
         <div class="empleados-grid">
           <label *ngFor="let e of empleadosFiltrados" class="empleado-card"
                 [class.selected]="isEmpleadoSeleccionado(e.id)"
@@ -160,15 +160,27 @@
                   (change)="toggleEmpleadoEquipo(e)" />
             <div class="info">
               <span class="name">{{ e.nombre_completo }}</span>
-              <span class="rol">{{ getRolNombre(e.rol_id) }} (ID: {{ e.rol_id }})</span>
-              <span class="tipo-rol">Tipo: {{ getTipoRolPorNombre(e.rol_id) }}</span>
+              <span class="rol">{{ getRolNombre(e.rol_id) }}</span>
+              
+              <!-- Estado del área - MEJORADO -->
+              <div class="estado-area">
+                <span *ngIf="!e.area_id" class="estado disponible">
+                  ✅ Disponible
+                </span>
+                <span *ngIf="e.area_id && e.area_id === areaJefeForm.controls.area_id.value" 
+                      class="estado asignado-actual">
+                  🔄 En esta área: {{ getAreaNombre(e.area_id) }}
+                </span>
+                <span *ngIf="e.area_id && e.area_id !== areaJefeForm.controls.area_id.value" 
+                      class="estado asignado-otra">
+                  ❌ Ocupado en: {{ getAreaNombre(e.area_id) }}
+                </span>
+              </div>
+              
               <small class="disponibilidad" 
-                    [class.disponible]="e.area_id === null"
-                    [class.asignado]="e.area_id !== null">
-                {{ getEstadoDisponibilidad(e) }}
-              </small>
-              <small class="area" *ngIf="e.area_id && e.area_id !== areaJefeForm.controls.area_id.value">
-                Área actual: {{ getAreaNombre(e.area_id) }}
+                    [class.disponible]="!e.area_id"
+                    [class.asignado]="e.area_id">
+                {{ e.area_id ? 'Asignado' : 'Disponible' }}
               </small>
             </div>
           </label>
@@ -232,49 +244,79 @@
         </div>
       </section>
 
-      <!-- Paso 4: Fechas y descansos -->
-      <section *ngIf="step===4" class="form-section">
-        <h3>4) Asignación individual de turnos por fecha</h3>
+        <section *ngIf="step===4" class="form-section">
+          <h3>4) Asignación individual de turnos por fecha</h3>
 
-        <div class="grid">
-          <label>Fecha inicio
-            <input type="date" [formControl]="fechasForm.controls.fecha_inicio">
-          </label>
-          <label>Fecha fin
-            <input type="date" [formControl]="fechasForm.controls.fecha_fin">
-          </label>
-        </div>
+          <!-- Fechas obligatorias -->
+          <div class="grid">
+            <label>Fecha inicio
+              <input type="date" [formControl]="fechasForm.controls.fecha_inicio" required>
+            </label>
+            <label>Fecha fin
+              <input type="date" [formControl]="fechasForm.controls.fecha_fin" required>
+            </label>
+          </div>
 
-        <div class="selector-empleado" *ngIf="equipoCompleto.length > 0">
-          <label>Seleccionar empleado:
-            <select [(ngModel)]="empleadoCalendarioSeleccionado">
-              <option [ngValue]="null">-- Seleccionar empleado --</option>
-              <option *ngFor="let emp of equipoCompleto" [ngValue]="emp.id">
+          <!-- Selección de empleado -->
+          <div class="selector-empleado" *ngIf="equipoCompleto.length > 0">
+            <label>Seleccionar empleado:
+              <select [(ngModel)]="empleadoCalendarioSeleccionado">
+                <option [ngValue]="null">-- Seleccionar empleado --</option>
+                <option *ngFor="let emp of equipoCompleto" [ngValue]="emp.id">
+                  {{ emp.nombre_completo }} - {{ getRolNombre(emp.rol_id) }}
+                </option>
+              </select>
+            </label>
+
+            <!-- Botón para abrir modal de reemplazo -->
+            <div *ngIf="empleadoCalendarioSeleccionado" class="acciones-empleado">
+              <button class="btn small warning"
+                      (click)="abrirModalReemplazo(empleadoCalendarioSeleccionado)">
+                🔄 Buscar reemplazo
+              </button>
+            </div>
+          </div>
+
+          <!-- Componente hijo del calendario -->
+          <app-calendario-turnos
+            *ngIf="empleadoCalendarioSeleccionado"
+            [empleadoId]="empleadoCalendarioSeleccionado!"
+            [equipo]="equipoCompleto"
+            [turnosDisponibles]="turnosDisponibles"
+            [fechaInicio]="fechasForm.controls.fecha_inicio.value || ''"
+            [fechaFin]="fechasForm.controls.fecha_fin.value || ''"
+            (asignacionesGuardadas)="recibirAsignaciones($event)"
+            (turnoAsignado)="recibirAsignaciones($event)">
+          </app-calendario-turnos>
+
+          <div class="actions">
+            <button class="btn outline" (click)="prevStep()">⬅ Atrás</button>
+            <button class="btn" (click)="guardarFormulario()">💾 Guardar y Finalizar</button>
+          </div>
+        </section>
+
+        <div class="modal" *ngIf="mostrarModalReemplazos">
+          <div class="modal-content">
+            <h3>Buscar reemplazo</h3>
+
+            <!-- Barra de búsqueda -->
+            <input type="text"
+                  placeholder="Buscar por nombre o apellido..."
+                  [(ngModel)]="busquedaReemplazo"
+                  (input)="filtrarEmpleadosReemplazo()" />
+
+            <!-- Resultados -->
+            <div class="resultados-reemplazo">
+              <div *ngFor="let emp of empleadosFiltradosReemplazo"
+                  class="empleado-resultado"
+                  (click)="asignarReemplazo(emp)">
                 {{ emp.nombre_completo }} - {{ getRolNombre(emp.rol_id) }}
-              </option>
-            </select>
-          </label>
+              </div>
+            </div>
+
+            <button class="btn outline" (click)="cerrarModalReemplazos()">Cancelar</button>
+          </div>
         </div>
-
-        <!-- Aquí se incrusta el componente hijo -->
-        <app-calendario-turnos
-          *ngIf="empleadoCalendarioSeleccionado"
-          [empleadoId]="empleadoCalendarioSeleccionado!"
-          [equipo]="equipoCompleto"
-          [turnosDisponibles]="turnosDisponibles"
-          [fechaInicio]="fechasForm.controls.fecha_inicio.value || ''"
-          [fechaFin]="fechasForm.controls.fecha_fin.value || ''"
-          (asignacionesGuardadas)="recibirAsignaciones($event)"
-           (turnoAsignado)="recibirAsignaciones($event)">>
-        </app-calendario-turnos>
-        
-
-        <div class="actions">
-          <button class="btn outline" (click)="prevStep()">Atrás</button>
-          <button class="btn" (click)="guardarFormulario()">Guardar y Finalizar</button>
-        </div>
-      </section>
-
     </ng-container>
 
     <!--  FIJOS  -->
