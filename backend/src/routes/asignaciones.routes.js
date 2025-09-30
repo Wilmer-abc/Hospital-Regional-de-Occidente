@@ -200,7 +200,7 @@ async function generarCalendarioRotativo(empleadosIds, fechaInicio, fechaFin, ti
   }
 
 // ================= CREAR BULK =================
-router.post('/bulk',requireAuth, async (req, res) => {
+router.post('/bulk', requireAuth, async (req, res) => {
   const { asignaciones } = req.body;
   if (!Array.isArray(asignaciones) || asignaciones.length === 0) {
     return res.status(400).json({ success: false, message: 'No hay asignaciones' });
@@ -236,7 +236,7 @@ router.post('/bulk',requireAuth, async (req, res) => {
 
     // Procesar cada asignación
     for (const a of asignaciones) {
-      if (!a.empleado_id || !a.turno_id || !a.fecha) {
+      if (!a.empleado_id || !a.turno_id || !a.fecha_inicio || !a.fecha_fin) {
         await conn.rollback();
         conn.release();
         return res.status(400).json({
@@ -246,24 +246,29 @@ router.post('/bulk',requireAuth, async (req, res) => {
         });
       }
 
-      // Verificar si ya existe una asignación para esa fecha/empleado
+      // Verificar si ya existe una asignación que se solape en el rango
       const [existentes] = await conn.query(
-        'SELECT id FROM asignacion_turnos WHERE empleado_id = ? AND fecha = ? AND eliminado_en IS NULL',
-        [a.empleado_id, a.fecha]
+        `SELECT id FROM asignacion_turnos 
+         WHERE empleado_id = ? 
+           AND ((fecha_inicio <= ? AND fecha_fin >= ?) OR (fecha_inicio <= ? AND fecha_fin >= ?)) 
+           AND eliminado_en IS NULL`,
+        [a.empleado_id, a.fecha_fin, a.fecha_inicio, a.fecha_inicio, a.fecha_fin]
       );
 
       if (existentes.length > 0) {
-        // Actualizar asignación existente (solo turno_id)
+        // Actualizar asignación existente (cambiar turno_id y rango)
         await conn.query(
-          'UPDATE asignacion_turnos SET turno_id = ? WHERE id = ?',
-          [a.turno_id, existentes[0].id]
+          `UPDATE asignacion_turnos 
+           SET turno_id = ?, fecha_inicio = ?, fecha_fin = ? 
+           WHERE id = ?`,
+          [a.turno_id, a.fecha_inicio, a.fecha_fin, existentes[0].id]
         );
       } else {
         // Insertar nueva asignación
         await conn.query(
-          `INSERT INTO asignacion_turnos (empleado_id, turno_id, fecha, creado_por)
-           VALUES (?, ?, ?, ?)`,
-          [a.empleado_id, a.turno_id, a.fecha, req.usuario?.id || null]
+          `INSERT INTO asignacion_turnos (empleado_id, turno_id, fecha_inicio, fecha_fin, creado_por)
+           VALUES (?, ?, ?, ?, ?)`,
+          [a.empleado_id, a.turno_id, a.fecha_inicio, a.fecha_fin, req.usuario?.id || null]
         );
       }
     }
@@ -290,6 +295,7 @@ router.post('/bulk',requireAuth, async (req, res) => {
     });
   }
 });
+
 
 
       module.exports = router;
