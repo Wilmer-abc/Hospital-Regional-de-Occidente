@@ -1155,3 +1155,36 @@ section.card {
   }
 }
 
+.area-asignada {
+  font-size: 0.85em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+  display: inline-block;
+  
+  &.area-actual {
+    background-color: #e8f5e8;
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+  }
+  
+  &.area-otra {
+    background-color: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+  }
+}
+
+.advertencia {
+  font-style: italic;
+  color: #d32f2f;
+}
+
+.empleado-card.not-selectable {
+  opacity: 0.6;
+  background-color: #f5f5f5;
+  
+  .info {
+    color: #666;
+  }
+}
