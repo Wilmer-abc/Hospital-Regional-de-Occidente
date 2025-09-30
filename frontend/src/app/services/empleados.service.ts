@@ -1,8 +1,8 @@
 // src/app/services/empleados.service.ts
 import { Injectable } from "@angular/core";
 import { HttpClient } from "@angular/common/http";
-import { Observable } from "rxjs";
-import { map } from 'rxjs/operators';
+import { BehaviorSubject, Observable } from "rxjs";
+import { map, tap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 
 export interface Empleado {
@@ -29,6 +29,8 @@ export interface Rol  { id: number; nombre: string; descripcion?: string | null;
 export interface Area { id: number; nombre: string; descripcion?: string | null; } 
 @Injectable({ providedIn: "root" })
 export class EmpleadosService {
+  private empleadosSubject = new BehaviorSubject<Empleado[]>([]);
+  public empleados$ = this.empleadosSubject.asObservable();
   private base = environment.apiBase;                 
   private empleadosUrl = `${this.base}/empleados`;
   private API_ROOT = `${environment.apiBase}/empleados`;
@@ -102,4 +104,25 @@ importarDesdeBiometrico(): Observable<any> {
   createArea(body: { nombre_area: string; descripcion?: string | null }) {
     return this.http.post<ApiResponse<any>>(this.areasUrl, body);
   }
+
+  actualizarEmpleado(empleadoActualizado: Empleado): void {
+    const empleados = this.empleadosSubject.value;
+    const index = empleados.findIndex(e => e.id === empleadoActualizado.id);
+    
+    if (index !== -1) {
+      empleados[index] = { ...empleados[index], ...empleadoActualizado };
+      this.empleadosSubject.next([...empleados]);
+    }
+  }
+
+  cargarEmpleados(): Observable<ApiResponse<Empleado[]>> {
+    return this.http.get<ApiResponse<Empleado[]>>(this.empleadosUrl).pipe(
+      tap((response: ApiResponse<Empleado[]>) => {
+        if (response.success && response.data) {
+          this.empleadosSubject.next(response.data);
+        }
+      })
+    );
+  }
+
 }
