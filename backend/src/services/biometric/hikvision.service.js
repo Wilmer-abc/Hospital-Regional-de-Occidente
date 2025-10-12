@@ -1,5 +1,5 @@
-const { makeClient } = require('./hikvision.client.cjs');
-const mock = require('./hikvision.mock');
+const { makeClient } = require('../biometric/hikvision.client.cjs');
+const mock = require('../biometric/hikvision.mock');
 
 const USE_MOCK = String(process.env.HIK_MOCK || 'true') === 'true';
 
