@@ -1,0 +1,95 @@
+<div class="reportes-container">
+  <h2>Reportes de Asistencia por Áreas</h2>
+
+  <div class="filtros">
+    <div class="filtro-group">
+      <label>🏢 Área:</label>
+      <select [(ngModel)]="areaSeleccionada">
+        <option value="">-- Seleccione área --</option>
+        <option *ngFor="let area of areas" [value]="area.id">{{ area.nombre_area }}</option>
+      </select>
+    </div>
+
+    <div class="filtro-group">
+      <label>📅 Mes:</label>
+      <input type="month" [(ngModel)]="mesSeleccionado" (change)="generarSemanas()" />
+    </div>
+
+    <div class="filtro-group">
+      <label>🗓️ Semana:</label>
+      <select [(ngModel)]="semanaSeleccionada">
+        <option [ngValue]="null">-- Seleccione semana --</option>
+        <option *ngFor="let s of semanas" [ngValue]="s">{{ s.texto }}</option>
+      </select>
+    </div>
+
+    <div class="botones-container">
+      <button (click)="generarReporte()">
+        <span>🚀 Generar</span>
+      </button>
+      <button (click)="descargarPDF()" [disabled]="registros.length === 0">
+        <span>📥 Descargar PDF</span>
+      </button>
+    </div>
+  </div>
+
+  <div *ngIf="cargando" class="cargando">
+    Generando reporte, por favor espere...
+  </div>
+
+  <div *ngIf="!cargando && registros.length > 0" class="resultados">
+    <p class="resumen">
+      Resumen: 
+      Total días: <strong>{{ obtenerResumen().total }}</strong> | 
+      Presentes: <strong>{{ obtenerResumen().presentes }}</strong> | 
+      Ausentes: <strong>{{ obtenerResumen().ausentes }}</strong>
+    </p>
+
+    <div class="tabla-container">
+      <table class="tabla-reporte">
+        <thead>
+          <tr>
+            <th>Área</th>
+            <th>Jefe de Área</th>
+            <th>Empleado</th>
+            <th>Cargo</th>
+            <th>Fecha</th>
+            <th>Turno</th>
+            <th>Entrada Prog.</th>
+            <th>Salida Prog.</th>
+            <th>Entrada Real</th>
+            <th>Salida Real</th>
+            <th>Cumplimiento</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of registros; let i = index">
+            <td>{{ r.area }}</td>
+            <td>{{ r.jefe_area || 'No asignado' }}</td>
+            <td>{{ r.empleado }}</td>
+            <td>{{ r.cargo }}</td>
+            <td>{{ r.fecha | date: 'dd/MM/yyyy' }}</td>
+            <td>{{ r.turno_asignado || 'N/A' }}</td>
+            <td>{{ r.hora_entrada_programada || 'N/A' }}</td>
+            <td>{{ r.hora_salida_programada || 'N/A' }}</td>
+            <!--CORREGIDO: Manejo seguro de fechas -->
+            <td [class.estado-presente]="r.entrada_real" [class.estado-ausente]="!r.entrada_real">
+              {{ r.entrada_real ? (r.entrada_real | date: 'HH:mm') : '--:--' }}
+            </td>
+            <td [class.estado-presente]="r.salida_real" [class.estado-ausente]="!r.salida_real">
+              {{ r.salida_real ? (r.salida_real | date: 'HH:mm') : '--:--' }}
+            </td>
+            <!--CORREGIDO: Métodos agregados -->
+            <td [class]="getCumplimientoClass(r.cumplimiento)">{{ r.cumplimiento || 'N/A' }}</td>
+            <td [class]="getEstadoClass(r.estado_dia)">{{ r.estado_dia || 'N/A' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div *ngIf="!cargando && registros.length === 0 && areaSeleccionada && semanaSeleccionada" class="sin-resultados">
+    <p>📭 No se encontraron registros para los filtros seleccionados.</p>
+  </div>
+</div>
