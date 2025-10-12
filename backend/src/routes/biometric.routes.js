@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const auth = require('../middlewares/auth');
-const svc = require('../services/biometric/hikvision.service');
+const svc = require('../services/biometric/hikvision.service.js');
 
 // Validacion defensiva: falla en arranque si falta algo
 ['requireAuth', 'requireAdmin'].forEach((k) => {
