@@ -1,66 +1,98 @@
 <div class="dashboard-container" *ngIf="!loading">
 
-  <!-- Sección de estadísticas -->
-  <div class="stats-container">
-    <!-- Tarjeta de Personal Total -->
-    <div class="stat-card">
-      <div class="icon"><i class="fas fa-users"></i></div>
-      <div class="info">
-        <p>Personal Total</p>
-        <h2>{{ data.personalTotal }}</h2>
-        <small *ngIf="!hasData">Esperando datos...</small>
+  <!-- Sección de estadísticas principales -->
+  <div class="stats-section">
+    <h3>Resumen de Personal</h3>
+    <div class="stats-container">
+      <!-- Tarjeta de Personal Total -->
+      <div class="stat-card">
+        <div class="icon"><i class="fas fa-users"></i></div>
+        <div class="info">
+          <p>Personal Total</p>
+          <h2>{{ data.personalTotal }}</h2>
+          <small *ngIf="!hasData">Esperando datos...</small>
+        </div>
+      </div>
+
+      <!-- Tarjeta de Personal Activo -->
+      <div class="stat-card">
+        <div class="icon"><i class="fas fa-user-check"></i></div>
+        <div class="info">
+          <p>Personal Activo</p>
+          <h2>{{ data.personalActivo }}</h2>
+          <small *ngIf="!hasData">Esperando datos...</small>
+        </div>
+      </div>
+
+      <!-- Tarjeta de Personal Inactivo -->
+      <div class="stat-card">
+        <div class="icon"><i class="fas fa-user-slash"></i></div>
+        <div class="info">
+          <p>Personal Inactivo</p>
+          <h2>{{ data.personalInactivo }}</h2>
+          <small *ngIf="!hasData">Esperando datos...</small>
+        </div>
+      </div>
+
+      <!-- Tarjeta de Personal sin Turno -->
+      <div class="stat-card">
+        <div class="icon"><i class="fas fa-user-clock"></i></div>
+        <div class="info">
+          <p>Personal sin Turno</p>
+          <h2>{{ data.personalSinTurno }}</h2>
+          <small *ngIf="!hasData">Esperando datos...</small>
+        </div>
       </div>
     </div>
-
-    <!-- Tarjeta de Personal Activo -->
-    <div class="stat-card">
-      <div class="icon"><i class="fas fa-user-check"></i></div>
-      <div class="info">
-        <p>Personal Activo</p>
-        <h2>{{ data.personalActivo }}</h2>
-        <small *ngIf="!hasData">Esperando datos...</small>
-      </div>
-    </div>
-
-    <!-- Tarjeta de Personal Inactivo -->
-    <div class="stat-card">
-      <div class="icon"><i class="fas fa-user-slash"></i></div>
-      <div class="info">
-        <p>Personal Inactivo</p>
-        <h2>{{ data.personalInactivo }}</h2>
-        <small *ngIf="!hasData">Esperando datos...</small>
-      </div>
-    </div>
-
-    <div class="stat-card">
-      <div class="icon"><i class="fas fa-calendar-day"></i></div>
-      <div class="info">
-        <p>Turnos de Hoy</p>
-        <h2>{{ data.turnosHoy }}</h2>
-        <small *ngIf="!hasData">Sin datos aún</small>
-      </div>
-    </div>
-
-    <div class="stat-card">
-      <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
-      <div class="info">
-        <p>Alertas</p>
-        <h2>{{ data.alertas }}</h2>
-        <small *ngIf="!hasData">No hay alertas registradas</small>
-      </div>
-    </div>
-
-    <!-- <div class="stat-card">
-      <div class="icon"><i class="fas fa-users-cog"></i></div>
-      <div class="info">
-        <p>Jerarquías</p>
-        <h2>{{ data.jerarquias }}</h2>
-        <small *ngIf="!hasData">Configuración no cargada</small>
-      </div>
-    </div> -->
   </div>
 
-  <!-- Contenido inferior (se mantiene igual) -->
+  <!-- Sección de Turnos -->
+  <div class="stats-section">
+    <h3>Gestión de Turnos</h3>
+    <div class="stats-container">
+      <!-- Tarjeta de Turnos Hoy -->
+      <div class="stat-card">
+        <div class="icon"><i class="fas fa-calendar-day"></i></div>
+        <div class="info">
+          <p>Turnos de Hoy</p>
+          <h2>{{ data.turnosHoy }}</h2>
+          <small *ngIf="!hasData">Sin datos aún</small>
+        </div>
+      </div>
+
+      <!-- Tarjeta de Turnos Fijos -->
+      <div class="stat-card">
+        <div class="icon"><i class="fas fa-calendar-check"></i></div>
+        <div class="info">
+          <p>Turnos Fijos</p>
+          <h2>{{ data.turnosFijos }}</h2>
+          <small *ngIf="!hasData">Sin datos aún</small>
+        </div>
+      </div>
+
+      <!-- Tarjeta de Turnos Rotativos -->
+      <div class="stat-card">
+        <div class="icon"><i class="fas fa-sync-alt"></i></div>
+        <div class="info">
+          <p>Turnos Rotativos</p>
+          <h2>{{ data.turnosRotativos }}</h2>
+          <small *ngIf="!hasData">Sin datos aún</small>
+        </div>
+      </div>
+
+      <!-- Tarjeta de Alertas -->
+      <div class="stat-card">
+        <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+        <div class="info">
+          <p>Alertas</p>
+          <h2>{{ data.alertas }}</h2>
+          <small *ngIf="!hasData">No hay alertas registradas</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contenido inferior -->
   <div class="bottom-section">
     
     <!-- Gráfico de asistencia semanal -->
