@@ -3,6 +3,10 @@ const axios = require("axios");
 const router = express.Router();
 const db = require('../db.js');
 const { requireAuth, requireRRHHorJefe } = require('../middlewares/auth.js');
+const { plantillaAsignacionNormal, plantillaAsignacionReemplazo } = require('../services/emailTemplates.js');
+const { sendEmail} = require('../services/email.service.js');
+
+
 
 // Configuración del biometrico
 const BIOMETRICO_HOST = process.env.HIK1_HOST || "192.168.0.45";
@@ -125,15 +129,37 @@ router.get('/empleado/:id/calendario', requireAuth, async (req, res) => {
 
   try {
     const [rows] = await db.query(
-      `SELECT a.fecha, a.turno_id, t.nombre_turno, t.hora_inicio, t.hora_fin
-       FROM asignacion_turnos a
-       JOIN turnos t ON a.turno_id = t.id
-       WHERE a.empleado_id = ? 
-         AND MONTH(a.fecha) = ? 
-         AND YEAR(a.fecha) = ?`,
-      [id, mes, año]
-    );
-    res.json({ success: true, data: rows });
+  `SELECT a.fecha_inicio, a.fecha_fin, a.turno_id, 
+          t.nombre_turno, t.hora_inicio, t.hora_fin
+   FROM asignacion_turnos a
+   JOIN turnos t ON a.turno_id = t.id
+   WHERE a.empleado_id = ? 
+     AND (
+       (YEAR(a.fecha_inicio) = ? AND MONTH(a.fecha_inicio) = ?)
+       OR
+       (YEAR(a.fecha_fin) = ? AND MONTH(a.fecha_fin) = ?)
+     )`,
+  [id, año, mes, año, mes]
+);
+
+  // Expandir rangos
+  const asignaciones = [];
+  rows.forEach(r => {
+    let f = new Date(r.fecha_inicio);
+    const fin = new Date(r.fecha_fin);
+    while (f <= fin) {
+      asignaciones.push({
+        fecha: f.toISOString().split("T")[0],
+        turno_id: r.turno_id,
+        nombre_turno: r.nombre_turno,
+        hora_inicio: r.hora_inicio,
+        hora_fin: r.hora_fin
+      });
+      f.setDate(f.getDate() + 1);
+    }
+  });
+
+  res.json({ success: true, data: asignaciones });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Error al obtener calendario', error: err.message });
   }
@@ -196,105 +222,184 @@ async function generarCalendarioRotativo(empleadosIds, fechaInicio, fechaFin, ti
       WHERE e.activo = 1 AND at.id IS NULL
     `, [fecha]);
     
-    return empleados;
+    return empleados; 
   }
 
-// ================= CREAR BULK =================
-router.post('/bulk', requireAuth, async (req, res) => {
-  const { asignaciones } = req.body;
-  if (!Array.isArray(asignaciones) || asignaciones.length === 0) {
-    return res.status(400).json({ success: false, message: 'No hay asignaciones' });
-  }
-
-  let conn;
-  try {
-    conn = await db.getConnection();
-    await conn.beginTransaction();
-
-    // VALIDAR que todos los turnos_id existen y no están eliminados
-    const turnosIds = [...new Set(asignaciones.map(a => a.turno_id).filter(id => id))];
-    if (turnosIds.length > 0) {
-      const placeholders = turnosIds.map(() => '?').join(',');
-      const [turnosExistentes] = await conn.query(
-        `SELECT id FROM turnos WHERE id IN (${placeholders}) AND eliminado_en IS NULL`,
-        turnosIds
-      );
-
-      const turnosExistentesIds = turnosExistentes.map(t => t.id);
-      const turnosInvalidos = turnosIds.filter(id => !turnosExistentesIds.includes(id));
-
-      if (turnosInvalidos.length > 0) {
-        await conn.rollback();
-        conn.release();
-        return res.status(400).json({
-          success: false,
-          message: 'Algunos turnos no existen',
-          turnosInvalidos
-        });
-      }
-    }
-
-    // Procesar cada asignación
-    for (const a of asignaciones) {
-      if (!a.empleado_id || !a.turno_id || !a.fecha_inicio || !a.fecha_fin) {
-        await conn.rollback();
-        conn.release();
-        return res.status(400).json({
-          success: false,
-          message: 'Datos incompletos en asignación',
-          asignacion: a
-        });
+    // ========================= CREAR ASIGNACIONES EN BULK =========================
+    router.post('/bulk', requireAuth, async (req, res) => {
+      const { asignaciones } = req.body;
+      if (!Array.isArray(asignaciones) || asignaciones.length === 0) {
+        return res.status(400).json({ success: false, message: 'No hay asignaciones' });
       }
 
-      // Verificar si ya existe una asignación que se solape en el rango
-      const [existentes] = await conn.query(
-        `SELECT id FROM asignacion_turnos 
-         WHERE empleado_id = ? 
-           AND ((fecha_inicio <= ? AND fecha_fin >= ?) OR (fecha_inicio <= ? AND fecha_fin >= ?)) 
-           AND eliminado_en IS NULL`,
-        [a.empleado_id, a.fecha_fin, a.fecha_inicio, a.fecha_inicio, a.fecha_fin]
-      );
+      let conn;
+      const resultadosCorreos = [];
 
-      if (existentes.length > 0) {
-        // Actualizar asignación existente (cambiar turno_id y rango)
-        await conn.query(
-          `UPDATE asignacion_turnos 
-           SET turno_id = ?, fecha_inicio = ?, fecha_fin = ? 
-           WHERE id = ?`,
-          [a.turno_id, a.fecha_inicio, a.fecha_fin, existentes[0].id]
+      try {
+        conn = await db.getConnection();
+        await conn.beginTransaction();
+
+        // 🔹 Filtrar duplicados en memoria (por seguridad)
+        const asignacionesUnicas = asignaciones.filter(
+          (a, i, arr) =>
+            i === arr.findIndex(
+              b =>
+                b.empleado_id === a.empleado_id &&
+                b.turno_id === a.turno_id &&
+                b.fecha_inicio === a.fecha_inicio &&
+                b.fecha_fin === a.fecha_fin
+            )
         );
-      } else {
-        // Insertar nueva asignación
+
+        // 🔹 Insertar todas las asignaciones ignorando duplicados
+        const placeholders = asignacionesUnicas.map(() => '(?, ?, ?, ?, ?, ?)').join(',');
+        const values = asignacionesUnicas.flatMap(a => [
+          a.empleado_id,
+          a.turno_id,
+          a.fecha_inicio,
+          a.fecha_fin,
+          req.user?.id || null,
+          null // lote_id
+        ]);
+
         await conn.query(
-          `INSERT INTO asignacion_turnos (empleado_id, turno_id, fecha_inicio, fecha_fin, creado_por)
-           VALUES (?, ?, ?, ?, ?)`,
-          [a.empleado_id, a.turno_id, a.fecha_inicio, a.fecha_fin, req.usuario?.id || null]
+          `INSERT IGNORE INTO asignacion_turnos 
+          (empleado_id, turno_id, fecha_inicio, fecha_fin, creado_por, lote_id)
+          VALUES ${placeholders}`,
+          values
         );
+
+        await conn.commit();
+
+        // =================== 📧 AGRUPAR Y ENVIAR CORREOS ===================
+        const empleadosMap = new Map();
+
+        for (const a of asignacionesUnicas) {
+          if (!empleadosMap.has(a.empleado_id)) empleadosMap.set(a.empleado_id, []);
+          empleadosMap.get(a.empleado_id).push(a);
+        }
+
+        for (const [empleado_id, asignacionesEmpleado] of empleadosMap.entries()) {
+          try {
+            // 🔹 Obtener info del empleado, área, jefe y sus turnos
+            const [[emp]] = await db.query(`
+              SELECT e.nombre_completo AS empleado_nombre, e.email, ar.nombre_area AS area_nombre
+              FROM empleados e
+              LEFT JOIN areas ar ON e.area_id = ar.id
+              WHERE e.id = ?;
+            `, [empleado_id]);
+
+            const [[jefe]] = await db.query(`
+              SELECT es.nombre_completo AS jefe_nombre
+              FROM area_supervisores s
+              JOIN empleados es ON es.id = s.empleado_id
+              WHERE s.area_id = ? AND s.es_titular = 1
+              LIMIT 1;
+            `, [emp?.area_id || null]);
+
+            // 🔹 Traer datos de turnos con detalles
+            const turnosIds = asignacionesEmpleado.map(a => a.turno_id);
+            const placeholdersTurnos = turnosIds.map(() => '?').join(',');
+            const [turnos] = await db.query(
+              `SELECT id, nombre_turno, hora_inicio, hora_fin 
+              FROM turnos WHERE id IN (${placeholdersTurnos})`,
+              turnosIds
+            );
+
+            // 🔹 Consolidar la lista de fechas y horarios
+            const listaTurnosHTML = asignacionesEmpleado
+              .map(a => {
+                const turno = turnos.find(t => t.id === a.turno_id);
+                return `
+                  <tr>
+                    <td>${a.fecha_inicio}</td>
+                    <td>${turno?.nombre_turno || '—'}</td>
+                    <td>${turno?.hora_inicio || '—'} - ${turno?.hora_fin || '—'}</td>
+                  </tr>`;
+              })
+              .join('');
+
+            // 🧩 Plantilla HTML unificada
+            const htmlMensaje = `
+              <div style="font-family: Arial, sans-serif; color: #333;">
+                <h2>📅 Nuevo turno asignado</h2>
+                <p>Hola <strong>${emp.empleado_nombre}</strong>,</p>
+                <p>Se te ha asignado a nuevos turnos en el área 
+                  <strong>${emp.area_nombre || 'Sin área'}</strong>.</p>
+
+                <table border="1" cellpadding="6" cellspacing="0" 
+                      style="border-collapse:collapse; margin-top:1rem; width:100%;">
+                  <thead style="background:#f3f3f3;">
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Turno</th>
+                      <th>Horario</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${listaTurnosHTML}
+                  </tbody>
+                </table>
+
+                <p style="margin-top:1rem;"><strong>Jefe responsable:</strong> ${jefe?.jefe_nombre || 'No asignado'}</p>
+                <hr>
+                <small>Hospital Regional de Occidente<br>
+                Sistema de Gestión de Asistencia</small>
+              </div>
+            `;
+
+            // 🔹 Enviar correo consolidado
+            if (emp.email) {
+              const enviado = await sendEmail(
+                emp.email,
+                '📅 Nuevos turnos asignados',
+                htmlMensaje
+              );
+              resultadosCorreos.push({
+                empleado_id,
+                correo: emp.email,
+                total_turnos: asignacionesEmpleado.length,
+                enviado
+              });
+            } else {
+              resultadosCorreos.push({
+                empleado_id,
+                correo: null,
+                total_turnos: asignacionesEmpleado.length,
+                enviado: false,
+                error: 'Empleado sin correo'
+              });
+            }
+          } catch (err) {
+            console.error('❌ Error enviando correo agrupado:', err.message);
+            resultadosCorreos.push({
+              empleado_id,
+              enviado: false,
+              error: err.message
+            });
+          }
+        }
+
+        // ✅ Respuesta final
+        res.json({
+          success: true,
+          message: 'Asignaciones registradas y correos enviados correctamente',
+          total_empleados: empleadosMap.size,
+          resultadosCorreos
+        });
+
+      } catch (error) {
+        if (conn) await conn.rollback();
+        console.error('❌ Error al crear asignaciones:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Error al crear asignaciones',
+          error: error.message
+        });
+      } finally {
+        if (conn) conn.release();
       }
-    }
-
-    await conn.commit();
-    conn.release();
-
-    res.json({
-      success: true,
-      message: 'Asignaciones guardadas correctamente',
-      total: asignaciones.length
     });
-
-  } catch (err) {
-    if (conn) {
-      await conn.rollback();
-      conn.release();
-    }
-    console.error('Error en bulk:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Error al guardar asignaciones',
-      error: err.message
-    });
-  }
-});
 
 
 
