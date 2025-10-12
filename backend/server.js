@@ -17,6 +17,8 @@ const asignacionesRoutes = require('./src/routes/asignaciones.routes.js');
 const attachActor = require('./src/middlewares/actor.js');
 const auditRouter = require('./src/routes/audit.routes.js');
 const reportesRouter = require('./src/routes/reportes.routes.js');
+const notificacioinesRouter = require('./src/routes/notificacioines.routes.js');
+const reportesRoutes = require('./src/routes/reportes.routes.js');
 
 
 const app = express();
@@ -44,6 +46,8 @@ app.use('/api/asignaciones', requireAuth, requireRRHHorJefe, asignacionesRoutes)
 app.use('/api/audit',        requireAuth, attachActor, auditRouter);
 app.use('/api/audit', requireAuth, attachActor, auditRouter);
 app.use('/api/reportes', requireAuth, requireRRHHorJefe, reportesRouter);
+app.use('/api/notificaciones', requireAuth, requireRRHHorJefe, notificacioinesRouter);
+app.use('/api/reportes', requireAuth, requireRRHHorJefe, reportesRoutes);
 
 // 404 JSON para /api/*
 app.use((req, res, next) => {
