@@ -3,14 +3,27 @@
   color: #333;
 }
 
+.stats-section {
+  margin-bottom: 30px;
+  
+  h3 {
+    margin-bottom: 15px;
+    color: #2c3e50;
+    font-size: 18px;
+    font-weight: 600;
+  }
+}
+
 .stats-container {
   display: flex;
   gap: 20px;
   margin-bottom: 30px;
+  flex-wrap: wrap;
 }
 
 .stat-card {
   flex: 1;
+  min-width: 200px;
   background: #fff;
   border: 1px solid #ddd;
   border-radius: 10px;
@@ -30,12 +43,19 @@
   margin: 0;
   font-size: 14px;
   color: #666;
+  text-transform: uppercase;
+  font-weight: 500;
 }
 
 .stat-card h2 {
-  margin: 0;
+  margin: 5px 0 0 0;
   font-size: 22px;
   font-weight: bold;
+}
+
+.stat-card small {
+  color: #888;
+  font-size: 12px;
 }
 
 .bottom-section {
@@ -52,6 +72,13 @@
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
+.chart-container h3, .turnos-container h3 {
+  margin: 0 0 15px 0;
+  color: #2c3e50;
+  font-size: 16px;
+  font-weight: 600;
+}
+
 .turnos-container .turno {
   padding: 8px 0;
   border-bottom: 1px solid #eee;
@@ -65,4 +92,26 @@
   text-align: center;
   font-size: 18px;
   padding: 50px;
+}
+
+.no-data {
+  text-align: center;
+  color: #888;
+  padding: 20px;
+  font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .stats-container {
+    flex-direction: column;
+  }
+  
+  .bottom-section {
+    flex-direction: column;
+  }
+  
+  .stat-card {
+    min-width: auto;
+  }
 }
