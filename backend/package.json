@@ -26,6 +26,7 @@
     "mysql2": "^3.14.3",
     "node-cron": "^4.2.1",
     "node-fetch": "^2.7.0",
+    "nodemailer": "^7.0.6",
     "zod": "^4.0.17"
   },
   "devDependencies": {
