@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../db.js');
 const { requireAuth, requireRRHHorJefe } = require('../middlewares/auth.js');
 
-// Helper: genera ultimos 7 daas 
+// Helper: genera ultimos 7 días 
 function last7Days() {
   const days = [];
   const today = new Date();
@@ -15,36 +15,6 @@ function last7Days() {
   }
   return days;
 }
-
-// Ruta principal del dashboard 
-router.get('/', requireAuth, requireRRHHorJefe, async (_req, res) => {
-  try {
-    const [[{ cActivos }]] = await db.query(
-      `SELECT COUNT(*) cActivos FROM empleados WHERE activo=1 AND eliminado_en IS NULL`
-    );
-    const [[{ cAreas }]] = await db.query(
-      `SELECT COUNT(*) cAreas FROM areas WHERE eliminado_en IS NULL`
-    );
-    
-    res.json({
-      success: true,
-      data: {
-        personalActivo: cActivos,
-        jerarquias: cAreas,
-        turnosHoy: 0,
-        alertas: 0,
-        proximosTurnos: { 
-          manana: { enfermeros: 0, medicos: 0 }, 
-          tarde: { enfermeros: 0, medicos: 0 }, 
-          noche: { enfermeros: 0, medicos: 0 } 
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Dashboard error:', error);
-    res.status(500).json({ success: false, error: 'Error cargando dashboard' });
-  }
-});
 
 // Ruta completa de resumen 
 router.get('/summary', requireAuth, requireRRHHorJefe, async (_req, res) => {
@@ -65,21 +35,50 @@ router.get('/summary', requireAuth, requireRRHHorJefe, async (_req, res) => {
     );
 
     // 4) Turnos hoy
-    const [[{ c: turnosHoy }]] = await db.query(
-      'SELECT COUNT(*) AS c FROM asignacion_turnos WHERE CURDATE() BETWEEN fecha_inicio AND fecha_fin'
-    );
+    const [[{ c: turnosHoy }]] = await db.query(`
+      SELECT COUNT(DISTINCT at.empleado_id) AS c 
+      FROM asignacion_turnos at 
+      WHERE CURDATE() BETWEEN at.fecha_inicio AND IFNULL(at.fecha_fin, CURDATE())
+        AND EXISTS (
+          SELECT 1 FROM empleados e 
+          WHERE e.id = at.empleado_id 
+          AND e.activo = 1 
+          AND e.eliminado_en IS NULL
+        )
+    `);
 
-    // 5) Alertas pendientes
+    // 5) Turnos fijos
+    const [[{ c: turnosFijos }]] = await db.query(`
+      SELECT COUNT(DISTINCT at.empleado_id) AS c 
+      FROM asignacion_turnos at
+      WHERE at.fecha_fin IS NULL 
+        OR at.fecha_fin > CURDATE()
+    `);
+
+    // 6) Turnos rotativos
+    const [[{ c: turnosRotativos }]] = await db.query(`
+      SELECT COUNT(DISTINCT at.empleado_id) AS c 
+      FROM asignacion_turnos at
+      WHERE at.fecha_fin IS NOT NULL 
+        AND at.fecha_fin > CURDATE()
+        AND DATEDIFF(at.fecha_fin, at.fecha_inicio) <= 30
+    `);
+
+    // 7) Personal sin turno (SIN ÁREA ASIGNADA) - CORREGIDO
+    const [[{ c: personalSinTurno }]] = await db.query(`
+      SELECT COUNT(*) AS c 
+      FROM empleados e
+      WHERE e.activo = 1 
+        AND e.eliminado_en IS NULL
+        AND e.area_id IS NULL  -- ✅ Solo empleados sin área asignada
+    `);
+
+    // 8) Alertas pendientes
     const [[{ c: alertas }]] = await db.query(
       "SELECT COUNT(*) AS c FROM alertas WHERE estado = 'PENDIENTE'"
     );
 
-    // 6) Jerarquias
-    const [[{ c: jerarquias }]] = await db.query(
-      'SELECT COUNT(*) AS c FROM areas WHERE eliminado_en IS NULL'
-    );
-
-    // 7) Proximos turnos
+    // 9) Próximos turnos
     const [prox] = await db.query(`
       SELECT
         t.nombre_turno AS turno,
@@ -112,7 +111,7 @@ router.get('/summary', requireAuth, requireRRHHorJefe, async (_req, res) => {
       else if (role.includes('medic')) bucket[slot].medicos += 1;
     }
 
-    // 8) Asistencia semanal
+    // 10) Asistencia semanal
     const days = last7Days();
     const [asistRaw] = await db.query(`
       SELECT DATE(fecha_hora) AS dia, COUNT(*) AS entradas
@@ -132,8 +131,10 @@ router.get('/summary', requireAuth, requireRRHHorJefe, async (_req, res) => {
         personalInactivo,
         personalTotal,
         turnosHoy,
+        turnosFijos,
+        turnosRotativos,
+        personalSinTurno,
         alertas,
-        jerarquias,
         proximosTurnos: bucket,
         asistenciaSemanal,
       }
