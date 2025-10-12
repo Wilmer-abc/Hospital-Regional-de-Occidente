@@ -1,7 +1,11 @@
 se nesecitan instalar las dependencias en ambas carpetas
-cd backend = npm install
+cd backend = npm install == esto para instalar dependencias
+cd backend = npm install nodemailer == esto para el envio de correos
+
+
 cd frontend = npm install
 cd frontend = npm install -g @angular/cli
+cd frontend = npm install jspdf jspdf-autotable
 
 
 para levantar ambas carpetas 
