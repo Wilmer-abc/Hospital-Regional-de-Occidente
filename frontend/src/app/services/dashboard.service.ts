@@ -13,8 +13,10 @@ export interface DashboardSummary {
   personalInactivo: number;    
   personalTotal: number; 
   turnosHoy: number;
+  turnosFijos: number;
+  turnosRotativos: number;
+  personalSinTurno: number;
   alertas: number;
-  jerarquias: number;
   proximosTurnos: ProximosTurnos;
   asistenciaSemanal: Array<{ fecha: string; entradas: number }>;
 }
