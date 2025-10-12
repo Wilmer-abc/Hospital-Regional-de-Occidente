@@ -12,11 +12,13 @@ import { DashboardService, DashboardSummary } from '../../services/dashboard.ser
 export class DashboardComponent implements OnInit {
   data: DashboardSummary = {
     personalActivo: 0,
-    personalInactivo: 0,      // ✅ Nuevo campo
+    personalInactivo: 0,
     personalTotal: 0,
     turnosHoy: 0,
+    turnosFijos: 0,
+    turnosRotativos: 0,
+    personalSinTurno: 0,
     alertas: 0,
-    jerarquias: 0,
     proximosTurnos: {
       manana: { enfermeros: 0, medicos: 0 },
       tarde:  { enfermeros: 0, medicos: 0 },
@@ -37,7 +39,8 @@ export class DashboardComponent implements OnInit {
   private hasAnyData(d: DashboardSummary): boolean {
     const top =
       d.personalActivo + d.personalInactivo + d.personalTotal +
-      d.personalActivo + d.turnosHoy + d.alertas + d.jerarquias +
+      d.turnosHoy + d.turnosFijos + d.turnosRotativos +
+      d.personalSinTurno + d.alertas +
       d.proximosTurnos.manana.enfermeros + d.proximosTurnos.manana.medicos +
       d.proximosTurnos.tarde.enfermeros  + d.proximosTurnos.tarde.medicos +
       d.proximosTurnos.noche.enfermeros  + d.proximosTurnos.noche.medicos;
