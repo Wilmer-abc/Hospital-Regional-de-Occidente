@@ -38,7 +38,10 @@ export class EmpleadosComponent implements OnInit {
     area_id: null,
     activo: true,
     // supervision: 'NINGUNO',
-    id: 0
+    id: 0,
+    asignacionesPrevias: undefined,
+    length: 0,
+    empleado: []
   };
 
   // Nuevas propiedades para gestión de supervisión

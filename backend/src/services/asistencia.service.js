@@ -123,23 +123,6 @@ function compararTurnoConEventos(turno, eventos) {
   return resultado;
 }
 
-// Ejemplo de uso
-const turnoEjemplo = {
-  horaInicio: "2025-09-24T08:00:00-06:00",
-  horaFin: "2025-09-24T16:30:00-06:00",
-  toleranciaEntrada: 15,
-  toleranciaSalida: 10
-};
-
-const eventosEjemplo = [
-  { time: "2025-09-24T08:10:00-06:00", attendanceStatus: "checkIn" },
-  { time: "2025-09-24T16:25:00-06:00", attendanceStatus: "checkOut" }
-];
-
-console.log(compararTurnoConEventos(turnoEjemplo, eventosEjemplo));
-
-
-
 module.exports = {
   procesarAsistenciaDia
 };

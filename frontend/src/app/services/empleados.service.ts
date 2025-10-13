@@ -6,6 +6,9 @@ import { map, tap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 
 export interface Empleado {
+  asignacionesPrevias: undefined;
+  length: number;
+  empleado: never[];
   id?: number;
   numero_empleado: string;
   nombre_completo: string;

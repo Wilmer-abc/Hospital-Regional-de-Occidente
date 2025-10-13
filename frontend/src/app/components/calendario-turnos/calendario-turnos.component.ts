@@ -5,12 +5,16 @@ import { FormsModule } from '@angular/forms';
 import { TurnosService, DiaTrabajo } from '../../services/turnos.service';
 
 interface DiaCalendario {
+  hora_salida: any;
+  hora_entrada: any;
+  turno_id: any;
+  asignado: boolean;
   fecha: string;
   diaSemana: string;
   numero: number;
   esHoy: boolean;
   esPasado: boolean;
-  asignaciones: (DiaTrabajo & { nombreEmpleado?: string })[];
+  asignaciones: (DiaTrabajo & { nombreEmpleado?: string, nombre_turno?: string })[];
   disponible: boolean;
   asignacionesPendientes: DiaTrabajo[];
 }
@@ -59,10 +63,78 @@ export class CalendarioTurnosComponent implements OnInit {
     this.asignacionesPendientes = [];
   }
 
+  @Input() set asignacionesPrevias(value: any[]) {
+    console.log('📥 Asignaciones previas recibidas:', value);
+    this._asignacionesPrevias = value || [];
+    this.marcarAsignacionesPrevias();
+  }
+  get asignacionesPrevias(): any[] {
+    return this._asignacionesPrevias;
+  }
+  private _asignacionesPrevias: any[] = [];
+
   ngOnInit() {
     this.generarCalendario();
     this.cargarAsignaciones();
+    
+    // 🔥 NUEVO: Si hay asignaciones previas, marcarlas inmediatamente
+    if (this.asignacionesPrevias.length > 0) {
+      setTimeout(() => {
+        this.marcarAsignacionesPrevias();
+      }, 100);
+    }
   }
+
+  marcarAsignacionesPrevias() {
+    console.log('🎯 Marcando asignaciones previas en calendario:', this.asignacionesPrevias);
+    
+    for (const asign of this.asignacionesPrevias) {
+      const dia = this.diasCalendario.find(d => d.fecha === asign.fecha);
+      if (dia) {
+        dia.asignado = true;
+        dia.turno_id = asign.turno_id;
+        dia.hora_entrada = asign.hora_entrada || asign.hora_inicio;
+        dia.hora_salida = asign.hora_salida || asign.hora_fin;
+        
+        // 🔥 NUEVO: Agregar a las asignaciones visuales
+        if (!dia.asignaciones.some(a => a.fecha === asign.fecha && a.turno_id === asign.turno_id)) {
+          dia.asignaciones.push({
+            fecha: asign.fecha,
+            empleado_id: this.empleadoId,
+            turno_id: asign.turno_id,
+            hora_entrada: asign.hora_entrada || asign.hora_inicio,
+            hora_salida: asign.hora_salida || asign.hora_fin,
+            necesita_reemplazo: false,
+            estado: 'ASIGNADO',
+            nombre_turno: asign.nombre_turno || 'Turno asignado',
+            fecha_inicio: ''
+          });
+        }
+        
+        console.log(`✅ Día ${asign.fecha} marcado como asignado`);
+      } else {
+        console.log(`❌ Día ${asign.fecha} no encontrado en calendario`);
+      }
+    }
+    
+    // Forzar actualización de la vista
+    this.diasCalendario = [...this.diasCalendario];
+  }
+
+   limpiarAsignacionesPrevias() {
+    this.diasCalendario.forEach(dia => {
+      dia.asignado = false;
+      dia.turno_id = undefined;
+      dia.hora_entrada = undefined;
+      dia.hora_salida = undefined;
+      dia.asignaciones = dia.asignaciones.filter(a => 
+        !this.asignacionesPrevias.some(ap => ap.fecha === a.fecha)
+      );
+    });
+  }
+
+
+
 
   get nombreMes(): string {
     return this.meses[this.mesActual];
@@ -97,6 +169,8 @@ export class CalendarioTurnosComponent implements OnInit {
     }
   }
 
+  
+
   private agregarDiaCalendario(fecha: Date, esExterno: boolean) {
     const hoy = new Date();
     const diaCalendario: DiaCalendario = {
@@ -107,7 +181,11 @@ export class CalendarioTurnosComponent implements OnInit {
       esPasado: fecha < hoy && !esExterno,
       asignaciones: [],
       disponible: !esExterno,
-      asignacionesPendientes: []
+      asignacionesPendientes: [],
+      hora_salida: undefined,
+      hora_entrada: undefined,
+      turno_id: undefined,
+      asignado: false
     };
 
     this.diasCalendario.push(diaCalendario);

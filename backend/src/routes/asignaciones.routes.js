@@ -402,5 +402,197 @@ async function generarCalendarioRotativo(empleadosIds, fechaInicio, fechaFin, ti
     });
 
 
+  // ========================= ASIGNAR TURNOS FIJOS =========================
+  router.post('/fijos', requireAuth, async (req, res) => {
+    // ✅ aceptar tanto 'empleados' como 'empleados_ids'
+    let { area_id, jefe_id, turno_id, empleados, empleados_ids, dias_descanso } = req.body;
+
+    // Unificar formato
+    if (!empleados && Array.isArray(empleados_ids)) {
+      empleados = empleados_ids.map(id => ({ id }));
+    }
+
+    // Normalizar días de descanso
+    if (typeof dias_descanso === 'string') {
+      dias_descanso = dias_descanso.split(',').map(d => d.trim());
+    }
+
+    // 🧭 Validaciones iniciales
+    if (!area_id || !jefe_id || !turno_id || !Array.isArray(empleados) || empleados.length === 0) {
+      console.warn('⚠️ Datos incompletos recibidos en /fijos:', req.body);
+      return res.status(400).json({
+        success: false,
+        message: 'Debe seleccionar el área, jefe, turno fijo y al menos un empleado.'
+      });
+    }
+
+    let conn;
+    try {
+      conn = await db.getConnection();
+      await conn.beginTransaction();
+
+      // 🧩 Obtener ID del usuario creador (puede venir de Keycloak)
+      // Si el usuario no existe aún en usuarios_sistema, será NULL
+      const creadorId = req.user?.id ?? null;
+      const creadorUsuario = req.user?.preferred_username || 'keycloak_user';
+
+      // 📦 Crear registro del lote (cabecera)
+      const [loteResult] = await conn.query(
+        `INSERT INTO asignaciones_lote 
+        (area_id, jefe_id, turno_id, fecha_inicio, fecha_fin, patron, dias_descanso, creado_por)
+        VALUES (?, ?, ?, CURDATE(), NULL, 'NORMAL', ?, ?)`,
+        [area_id, jefe_id, turno_id, dias_descanso?.join(',') || null, creadorId]
+      );
+
+      const loteId = loteResult.insertId;
+      console.log(`📦 Lote fijo creado (ID: ${loteId}) por ${creadorUsuario}`);
+
+      // 🔹 Insertar las asignaciones para todos los empleados
+      const placeholders = empleados.map(() => '(?, ?, CURDATE(), CURDATE(), ?, ?)').join(',');
+      const values = empleados.flatMap(emp => [
+        emp.id,
+        turno_id,
+        creadorId,
+        loteId
+      ]);
+
+      await conn.query(
+        `INSERT INTO asignacion_turnos 
+        (empleado_id, turno_id, fecha_inicio, fecha_fin, creado_por, lote_id)
+        VALUES ${placeholders}`,
+        values
+      );
+
+      await conn.commit();
+
+      // =================== 📧 Enviar correos ===================
+      const resultadosCorreos = [];
+      for (const emp of empleados) {
+        try {
+          const [[infoEmpleado]] = await db.query(`
+            SELECT e.nombre_completo, e.email, ar.nombre_area AS area_nombre
+            FROM empleados e
+            LEFT JOIN areas ar ON e.area_id = ar.id
+            WHERE e.id = ?`, [emp.id]);
+
+          if (infoEmpleado?.email) {
+            const htmlMensaje = `
+              <div style="font-family: Arial, sans-serif; color: #333;">
+                <h2>📅 Turno fijo asignado</h2>
+                <p>Hola <strong>${infoEmpleado.nombre_completo}</strong>,</p>
+                <p>Se te ha asignado un turno fijo en el área 
+                  <strong>${infoEmpleado.area_nombre || 'Sin área'}</strong>.</p>
+                <p>Horario: <strong>08:00 AM - 04:00 PM</strong></p>
+                <p>Días de descanso: <strong>${dias_descanso?.length ? dias_descanso.join(', ') : 'Ninguno'}</strong></p>
+                <hr>
+                <small>Hospital Regional de Occidente<br>
+                Sistema de Gestión de Asistencia</small>
+              </div>
+            `;
+            const enviado = await sendEmail(
+              infoEmpleado.email,
+              '📅 Turno fijo asignado',
+              htmlMensaje
+            );
+            resultadosCorreos.push({ empleado_id: emp.id, correo: infoEmpleado.email, enviado });
+          } else {
+            resultadosCorreos.push({ empleado_id: emp.id, correo: null, enviado: false });
+          }
+        } catch (err) {
+          console.error(`❌ Error enviando correo a empleado ${emp.id}:`, err.message);
+          resultadosCorreos.push({ empleado_id: emp.id, error: err.message });
+        }
+      }
+
+      // =================== 🧾 Registrar en bitácora ===================
+      await db.query(
+        `INSERT INTO audit_log (evento, entidad, entidad_id, actor_id, actor_username, ip, user_agent)
+        VALUES ('CREATE', 'asignaciones_lote', ?, ?, ?, ?, ?)`,
+        [
+          loteId,
+          creadorId,
+          creadorUsuario,
+          req.ip || null,
+          req.headers['user-agent'] || null
+        ]
+      );
+
+      console.log(`✅ Turnos fijos asignados correctamente para ${empleados.length} empleados.`);
+
+      res.json({
+        success: true,
+        message: `Turnos fijos asignados correctamente.`,
+        lote_id: loteId,
+        total_empleados: empleados.length,
+        resultadosCorreos
+      });
+    } catch (error) {
+      if (conn) await conn.rollback();
+      console.error('❌ Error en /fijos:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al asignar turnos fijos',
+        error: error.message
+      });
+    } finally {
+      if (conn) conn.release();
+    }
+  });
+
+
+      // =================== 📅 OBTENER ASIGNACIONES EXISTENTES DE UN EMPLEADO ===================
+    router.get('/empleado/:id', requireAuth, async (req, res) => {
+      const { id } = req.params;
+      const { desde, hasta } = req.query;
+
+      if (!id || !desde || !hasta) {
+        return res.status(400).json({
+          success: false,
+          message: 'Faltan parámetros (id, desde, hasta)',
+        });
+      }
+
+      try {
+        const [rows] = await db.query(
+          `SELECT a.id, a.empleado_id, a.turno_id, 
+                  a.fecha_inicio, a.fecha_fin,
+                  t.nombre_turno, t.hora_inicio, t.hora_fin
+          FROM asignacion_turnos a
+          INNER JOIN turnos t ON t.id = a.turno_id
+          WHERE a.empleado_id = ?
+            AND a.fecha_inicio BETWEEN ? AND ?
+            AND a.eliminado_en IS NULL`,
+          [id, desde, hasta]
+        );
+
+        // Expandir días dentro de los rangos
+        const asignaciones = [];
+        rows.forEach(r => {
+          let f = new Date(r.fecha_inicio);
+          const fin = new Date(r.fecha_fin);
+          while (f <= fin) {
+            asignaciones.push({
+              fecha: f.toISOString().split('T')[0],
+              turno_id: r.turno_id,
+              nombre_turno: r.nombre_turno,
+              hora_inicio: r.hora_inicio,
+              hora_fin: r.hora_fin
+            });
+            f.setDate(f.getDate() + 1);
+          }
+        });
+
+        res.json({ success: true, asignaciones });
+      } catch (error) {
+        console.error('❌ Error al obtener asignaciones:', error);
+        res.status(500).json({
+          success: false,
+          message: 'Error al obtener asignaciones del empleado',
+          error: error.message,
+        });
+      }
+    });
+
+
 
       module.exports = router;

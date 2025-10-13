@@ -1188,3 +1188,215 @@ section.card {
     color: #666;
   }
 }
+
+// Estilos para centrar y animar la vista principal
+.selection-card {
+  text-align: center;
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e3e6f0;
+  animation: fadeInUp 0.6s ease-out;
+  
+  h2 {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+    color: #1e293b;
+    font-weight: 700;
+    position: relative;
+    
+    &::after {
+      content: '';
+      display: block;
+      width: 100px;
+      height: 4px;
+      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+      margin: 1rem auto;
+      border-radius: 2px;
+    }
+  }
+}
+
+.selection-options {
+  display: flex;
+  justify-content: center;
+  gap: 2.5rem;
+  margin-top: 2.5rem;
+  flex-wrap: wrap;
+}
+
+.option-card {
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  width: 320px;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  text-align: center;
+  background: white;
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+    transform: scaleX(0);
+    transition: transform 0.3s ease;
+  }
+  
+  &:hover {
+    border-color: #3b82f6;
+    transform: translateY(-8px);
+    box-shadow: 0 20px 40px rgba(59, 130, 246, 0.15);
+    
+    &::before {
+      transform: scaleX(1);
+    }
+    
+    .option-icon {
+      transform: scale(1.1);
+    }
+  }
+  
+  &:active {
+    transform: translateY(-4px);
+  }
+}
+
+.option-icon {
+  font-size: 4rem;
+  margin-bottom: 1.5rem;
+  display: block;
+  transition: transform 0.3s ease;
+  filter: grayscale(0.2);
+}
+
+.option-card h3 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.option-card p {
+  color: #64748b;
+  line-height: 1.6;
+  font-size: 1rem;
+  margin: 0;
+}
+
+// Animación de entrada mejorada
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Aplicar animación a todo el wrapper
+.wrapper {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+// Estilos para las vistas de lista (también centradas)
+.card:not(.selection-card) {
+  max-width: 1000px;
+  margin: 2rem auto;
+  animation: fadeInUp 0.5s ease-out;
+}
+
+// Efecto hover mejorado para las configuraciones guardadas
+.option-card .delete-conf-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  opacity: 0;
+  transform: scale(0.8);
+  
+  &:hover {
+    background: #dc2626;
+    transform: scale(1);
+  }
+}
+
+.option-card:hover .delete-conf-btn {
+  opacity: 1;
+  transform: scale(1);
+}
+
+// Estilos para la información de las configuraciones guardadas
+.option-card small {
+  display: block;
+  margin-top: 1rem;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+// Responsive improvements
+@media (max-width: 768px) {
+  .selection-card {
+    margin: 1rem;
+    padding: 1.5rem;
+    
+    h2 {
+      font-size: 1.6rem;
+    }
+  }
+  
+  .selection-options {
+    gap: 1.5rem;
+  }
+  
+  .option-card {
+    width: 100%;
+    max-width: 300px;
+    padding: 2rem 1.5rem;
+  }
+  
+  .option-icon {
+    font-size: 3rem;
+  }
+}
+
+// Efecto de brillo al hacer hover
+.option-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  transition: left 0.5s ease;
+}
+
+.option-card:hover::after {
+  left: 100%;
+}
