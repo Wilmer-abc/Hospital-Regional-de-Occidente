@@ -364,83 +364,65 @@ eliminarConfiguracion(conf: any, vista: string) {
     });
   }
 
-    guardarTurnosFijos() {
-    const area_id = this.fijoForm.controls.area_id.value;
-    const jefe_id = this.fijoForm.controls.jefe_id.value;
+guardarTurnosFijos() {
+  const area_id = this.fijoForm.controls.area_id.value;
+  const jefe_id = this.fijoForm.controls.jefe_id.value;
+  const turno_id = this.empleadosFijos.length > 0 ? this.empleadosFijos[0].turnoAsignado : null;
 
-    // ✅ Obtener el turno seleccionado (uno para todos los empleados)
-    const turno_id = this.empleadosFijos.length > 0 ? this.empleadosFijos[0].turnoAsignado : null;
-
-    console.log('🧭 Valores actuales:', { area_id, jefe_id, turno_id });
-
-    // ✅ Validaciones básicas
-    if (!area_id || !jefe_id || !turno_id) {
-      alert('Debe seleccionar el área, jefe y turno fijo para los empleados.');
-      return;
-    }
-
-    if (this.empleadosFijos.length === 0) {
-      alert('No hay empleados en el área seleccionada.');
-      return;
-    }
-
-    // ✅ Armar datos para envío
-    const empleados_ids = this.empleadosFijos.map(e => e.id);
-    const dias_descanso = this.descansoGrupal
-      .map((checked, i) => (checked ? i.toString() : null))
-      .filter(Boolean)
-      .join(',');
-
-    const payload = {
-      area_id,
-      jefe_id,
-      turno_id,
-      empleados_ids,
-      dias_descanso
-    };
-
-    console.log('📦 Enviando turnos fijos:', payload);
-
-    // ✅ Enviar al backend
-    this.http.post(`${API}/asignaciones/fijos`, payload).subscribe({
-      next: (res: any) => {
-        console.log('✅ Turnos fijos asignados:', res);
-        alert('Turnos fijos asignados correctamente.');
-
-        // 🧩 Crear tarjeta local (vista previa sin recargar)
-        const nuevaTarjeta = {
-          id: res.lote_id || Date.now(), // si backend no devuelve id, generamos temporal
-          areaNombre: this.getAreaNombre(area_id),
-          jefeNombre: this.jefesCandidatos.find(j => j.id === jefe_id)?.nombre_completo || '—',
-          empleadosCount: empleados_ids.length,
-          tipo: 'FIJO',
-          fechaCreacion: new Date(),
-        };
-
-        console.log('🪶 Nueva tarjeta creada:', nuevaTarjeta);
-
-        // ✅ Agregar al listado de configuraciones fijas
-        if (!this.configuracionesFijas) {
-          this.configuracionesFijas = [];
-        }
-        this.configuracionesFijas.push(nuevaTarjeta);
-
-        // ✅ Cambiar vista a la lista de tarjetas
-        this.vista = 'LISTA_FIJOS';
-
-        // ✅ Limpiar formulario y variables temporales
-        this.resetFormulario();
-        this.fijoForm.reset();
-        this.empleadosFijos = [];
-        this.descansoGrupal = new Array(7).fill(false);
-        this.info = 'Turnos fijos guardados correctamente.';
-      },
-      error: (err) => {
-        console.error('❌ Error guardando turnos fijos:', err);
-        alert('Error al guardar turnos fijos.');
-      }
-    });
+  if (!area_id || !jefe_id || !turno_id) {
+    alert('Debe seleccionar el área, jefe y turno fijo para los empleados.');
+    return;
   }
+
+  if (this.empleadosFijos.length === 0) {
+    alert('No hay empleados en el área seleccionada.');
+    return;
+  }
+
+  const empleados_ids = this.empleadosFijos.map(e => e.id);
+  const dias_descanso = this.descansoGrupal
+    .map((checked, i) => (checked ? i.toString() : null))
+    .filter(Boolean)
+    .join(',');
+
+  const payload = { area_id, jefe_id, turno_id, empleados_ids, dias_descanso };
+  console.log('📦 Enviando turnos fijos:', payload);
+
+  this.turnosService.guardarTurnosFijos(payload).subscribe({
+    next: (res: any) => {
+      console.log('✅ Turnos fijos creados:', res);
+
+      // ✅ Crear tarjeta visual
+      const nuevaConfig = {
+        id: res.lote_id || Date.now(),
+        areaNombre: this.areas.find(a => a.id === area_id)?.nombre || 'Área desconocida',
+        jefeNombre: this.jefesCandidatos.find(j => j.id === jefe_id)?.nombre_completo || 'Jefe desconocido',
+        empleadosCount: empleados_ids.length,
+        tipo: 'FIJO',
+        fechaCreacion: new Date(),
+      };
+
+      // ✅ Insertar y forzar renderizado
+      this.configuracionesFijas = [...this.configuracionesFijas, nuevaConfig];
+
+      // ✅ Reset visual
+      this.vista = 'LISTA_FIJOS';
+      this.info = `Turno fijo creado correctamente para ${empleados_ids.length} empleado(s).`;
+
+      // 🔄 Limpiar formulario
+      this.fijoForm.reset();
+      this.empleadosFijos = [];
+      this.descansoGrupal.fill(false);
+    },
+    error: (err) => {
+      console.error('❌ Error guardando turnos fijos:', err);
+      this.error = 'Error al guardar los turnos fijos.';
+    }
+  });
+}
+
+
+
 
 
 // 🔥 NUEVO MÉTODO: Guardar configuración fija en localStorage
@@ -1236,71 +1218,6 @@ abrirFormulario(id: any) {
     guardarTurnoEnDB(turno: Turno) {
     return this.http.post<Turno>(`${API}/turnos`, turno);
   }
-
-  // private guardarConfiguracionRotativo() {
-  //   const conf = {
-  //     id: this.editandoId === 'NUEVO' ? Date.now() : this.editandoId,
-  //     areaId: this.areaJefeForm.value.area_id,
-  //     jefeId: this.areaJefeForm.value.jefe_id,
-  //     equipo: [...this.equipoCompleto],
-  //     turnos: [...this.turnos],
-  //     reemplazos: [...this.reemplazos],
-  //     fecha_inicio: this.fechasForm.value.fecha_inicio,
-  //     fecha_fin: this.fechasForm.value.fecha_fin,
-  //     patron: this.fechasForm.value.patron,
-  //     areaNombre: this.getAreaNombre(this.areaJefeForm.value.area_id ?? null),
-  //     jefeNombre: this.getEmpleadoNombre(this.areaJefeForm.value.jefe_id ?? null),
-  //     empleadosCount: this.equipoCompleto.length,
-  //     fechaCreacion: new Date().toISOString()
-  //   };
-
-  //   const configs = this.configuracionesRotativas;
-  //   if (this.editandoId === 'NUEVO') {
-  //     configs.push(conf);
-  //   } else {
-  //     const index = configs.findIndex(c => c.id === this.editandoId);
-  //     if (index !== -1) configs[index] = conf;
-  //   }
-  //   this.configuracionesRotativas = configs;
-  //   this.vista = 'LISTA_ROTATIVOS';
-  //   this.info = 'Configuración rotativa guardada correctamente';
-  //   this.resetFormulario();
-  // }
-
-  // private guardarTurnosFijos() {
-  //   if (this.fijoForm.invalid) {
-  //     this.error = 'Completa todos los campos requeridos';
-  //     return;
-  //   }
-
-  //   const conf = {
-  //     id: this.editandoId === 'NUEVO' ? Date.now() : this.editandoId,
-  //     areaId: this.fijoForm.value.area_id,
-  //     jefeId: this.fijoForm.value.jefe_id,
-  //     empleadosFijos: this.empleadosFijos.map(emp => ({
-  //       ...emp,
-  //       turnoId: emp.turnoAsignado
-  //     })),
-  //     turnos: [...this.turnos],
-  //     descansoGrupal: { ...this.descansoGrupal },
-  //     areaNombre: this.getAreaNombre(this.fijoForm.value.area_id ?? null),
-  //     jefeNombre: this.getEmpleadoNombre(this.fijoForm.value.jefe_id ?? null),
-  //     empleadosCount: this.empleadosFijos.length,
-  //     fechaCreacion: new Date().toISOString()
-  //   };
-
-  //   const configs = this.configuracionesFijas;
-  //   if (this.editandoId === 'NUEVO') {
-  //     configs.push(conf);
-  //   } else {
-  //     const index = configs.findIndex(c => c.id === this.editandoId);
-  //     if (index !== -1) configs[index] = conf;
-  //   }
-  //   this.configuracionesFijas = configs;
-  //   this.vista = 'LISTA_FIJOS';
-  //   this.info = 'Configuración fija guardada correctamente';
-  //   this.resetFormulario();
-  // }
 
   // Después de asignar el turno exitosamente, actualiza los empleados
     asignarTurno() {

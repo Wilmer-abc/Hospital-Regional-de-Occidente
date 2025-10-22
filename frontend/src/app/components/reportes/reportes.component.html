@@ -70,15 +70,14 @@
             <td>{{ r.empleado }}</td>
             <td>{{ r.cargo }}</td>
             <td>{{ r.fecha | date: 'dd/MM/yyyy' }}</td>
-            <td>{{ r.turno_asignado || 'N/A' }}</td>
+            <td>{{ r.turno_asignado || 'N/A' }}</td> 
             <td>{{ r.hora_entrada_programada || 'N/A' }}</td>
             <td>{{ r.hora_salida_programada || 'N/A' }}</td>
-            <!--CORREGIDO: Manejo seguro de fechas -->
             <td [class.estado-presente]="r.entrada_real" [class.estado-ausente]="!r.entrada_real">
-              {{ r.entrada_real ? (r.entrada_real | date: 'HH:mm') : '--:--' }}
+              {{ r.entrada_real ? formatearHora(r.entrada_real) : '--:--' }}
             </td>
             <td [class.estado-presente]="r.salida_real" [class.estado-ausente]="!r.salida_real">
-              {{ r.salida_real ? (r.salida_real | date: 'HH:mm') : '--:--' }}
+              {{ r.salida_real ? formatearHora(r.salida_real) : '--:--' }}
             </td>
             <!--CORREGIDO: Métodos agregados -->
             <td [class]="getCumplimientoClass(r.cumplimiento)">{{ r.cumplimiento || 'N/A' }}</td>

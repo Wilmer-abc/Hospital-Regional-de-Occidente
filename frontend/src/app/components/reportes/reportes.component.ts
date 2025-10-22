@@ -25,7 +25,25 @@ export class ReportesComponent implements OnInit {
   cargando = false;
 
   ngOnInit() {
-    this.repService.getAreas().subscribe((res) => (this.areas = res.areas));
+    this.repService.getAreas().subscribe({
+      next: (res) => {
+        this.areas = res.areas;
+        console.log('Áreas cargadas:', this.areas);
+      },
+      error: (err) => {
+        console.error('Error cargando áreas:', err);
+      }
+    });
+  }
+
+  obtenerNombreArea() {
+    const areaObj = this.areas.find(a => a.id === this.areaSeleccionada);
+    console.log('Buscando área:', {
+      seleccionada: this.areaSeleccionada,
+      areas: this.areas,
+      encontrada: areaObj
+    });
+    return areaObj ? areaObj.nombre_area : 'Área no encontrada';
   }
 
   generarSemanas() {
@@ -54,32 +72,43 @@ export class ReportesComponent implements OnInit {
     this.semanaSeleccionada = null;
   }
 
-  generarReporte() {
-    if (!this.areaSeleccionada || !this.semanaSeleccionada) {
-      alert('Seleccione un área y una semana.');
-      return;
+generarReporte() {
+  if (!this.areaSeleccionada || !this.semanaSeleccionada) {
+    alert('Seleccione un área y una semana.');
+    return;
+  }
+
+  const { desde, hasta } = this.semanaSeleccionada;
+  this.cargando = true;
+
+  console.log('Generando reporte con:', {
+    areaId: this.areaSeleccionada,
+    desde,
+    hasta,
+    areasDisponibles: this.areas
+  });
+
+  this.repService.getReporte(this.areaSeleccionada, desde, hasta).subscribe({
+    next: (res) => {
+      console.log('Datos recibidos:', res.registros);
+      this.registros = res.registros;
+      this.cargando = false;
+    },
+    error: (err) => {
+      console.error('Error al generar reporte:', err);
+      this.cargando = false;
     }
+  });
+}
 
-    const { desde, hasta } = this.semanaSeleccionada;
-    this.cargando = true;
+obtenerResumen() {
+  const total = this.registros.length;
+  const presentes = this.registros.filter(r => r.estado_dia === 'Presente').length;
+  const ausentes = this.registros.filter(r => r.estado_dia === 'Ausente').length;
+  return { total, presentes, ausentes };
+}
 
-    this.repService.getReporte(this.areaSeleccionada, desde, hasta).subscribe({
-      next: (res) => {
-        this.registros = res.registros;
-        this.cargando = false;
-      },
-      error: () => (this.cargando = false)
-    });
-  }
-
-  obtenerResumen() {
-    const total = this.registros.length;
-    const presentes = this.registros.filter(r => r.estado_dia === 'Presente').length;
-    const ausentes = this.registros.filter(r => r.estado_dia === 'Ausente').length;
-    return { total, presentes, ausentes };
-  }
-
-  // ✅ MÉTODOS NUEVOS PARA LAS CLASES DINÁMICAS
+  // MÉTODOS NUEVOS PARA LAS CLASES DINÁMICAS
   getCumplimientoClass(cumplimiento: string): string {
     if (!cumplimiento) return '';
     
@@ -110,12 +139,8 @@ export class ReportesComponent implements OnInit {
     const logo = new Image();
     logo.src = 'assets/logo-hospital.png';
 
-    const fechaGen = new Date().toLocaleString('es-GT', {
-      dateStyle: 'short',
-      timeStyle: 'short'
-    });
-
-    const area = this.obtenerNombreArea();
+    const fechaGen = new Date().toLocaleDateString('es-GT');
+    const area = this.obtenerNombreArea().replace(/\s+/g, '_');
     const rango = this.obtenerRangoSeleccionado();
     const resumen = this.obtenerResumen();
 
@@ -124,7 +149,7 @@ export class ReportesComponent implements OnInit {
       try {
         doc.addImage(logo, 'PNG', 14, 8, 25, 25);
       } catch (e) {
-        console.warn('⚠️ No se pudo cargar el logo, continuando sin imagen...');
+        console.warn('No se pudo cargar el logo, continuando sin imagen...');
       }
 
       doc.setFont('helvetica', 'bold');
@@ -134,7 +159,7 @@ export class ReportesComponent implements OnInit {
 
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Área: ${area}`, 14, 38);
+      doc.text(`Área: ${this.obtenerNombreArea()}`, 14, 38);
       doc.text(`Periodo: ${rango}`, 90, 38);
       doc.text(`Generado: ${fechaGen}`, 200, 38);
 
@@ -160,16 +185,12 @@ export class ReportesComponent implements OnInit {
       const filas = this.registros.map((r) => ({
         empleado: r.empleado,
         cargo: r.cargo,
-        fecha: new Date(r.fecha).toLocaleDateString('es-GT'),
-        turno_asignado: r.turno_asignado,
-        hora_entrada_programada: r.hora_entrada_programada,
-        hora_salida_programada: r.hora_salida_programada,
-        entrada_real: r.entrada_real
-          ? new Date(r.entrada_real).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          : '',
-        salida_real: r.salida_real
-          ? new Date(r.salida_real).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          : '',
+        fecha: this.formatearFecha(r.fecha),
+        turno_asignado: r.turno_asignado || 'N/A',
+        hora_entrada_programada: r.hora_entrada_programada || 'N/A',
+        hora_salida_programada: r.hora_salida_programada || 'N/A',
+        entrada_real: r.entrada_real ? this.formatearHora(r.entrada_real) : '--:--',
+        salida_real: r.salida_real ? this.formatearHora(r.salida_real) : '--:--',
         cumplimiento: r.cumplimiento,
         estado_dia: r.estado_dia
       }));
@@ -181,7 +202,10 @@ export class ReportesComponent implements OnInit {
         styles: { fontSize: 8, cellPadding: 2 },
         headStyles: { fillColor: [0, 82, 155], textColor: 255, halign: 'center' },
         alternateRowStyles: { fillColor: [240, 240, 240] },
-        columnStyles: { cumplimiento: { halign: 'center' }, estado_dia: { halign: 'center' } },
+        columnStyles: { 
+          cumplimiento: { halign: 'center' }, 
+          estado_dia: { halign: 'center' } 
+        },
         didDrawPage: (data) => {
           const pageSize = doc.internal.pageSize;
           const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
@@ -194,9 +218,9 @@ export class ReportesComponent implements OnInit {
         }
       });
 
-      doc.save(
-        `Reporte_${area.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
-      );
+      // ✅ NOMBRE CORREGIDO del archivo
+      const nombreArchivo = `Reporte_${area}_${fechaGen.replace(/\//g, '-')}.pdf`;
+      doc.save(nombreArchivo);
     };
 
     setTimeout(() => {
@@ -208,9 +232,36 @@ export class ReportesComponent implements OnInit {
     }, 500);
   }
 
-  obtenerNombreArea() {
-    const areaObj = this.areas.find(a => a.id === this.areaSeleccionada);
-    return areaObj ? areaObj.nombre_area : 'Área desconocida'; // ✅ Corregido: nombre_area
+  // NUEVO MÉTODO para formatear fechas correctamente
+  formatearFecha(fechaString: string): string {
+    if (!fechaString) return 'N/A';
+    
+    try {
+      const fecha = new Date(fechaString);
+      // Ajustar para problema de zona horaria
+      fecha.setMinutes(fecha.getMinutes() + fecha.getTimezoneOffset());
+      return fecha.toLocaleDateString('es-GT');
+    } catch (e) {
+      return 'Fecha inválida';
+    }
+  }
+
+  // NUEVO MÉTODO para formatear horas correctamente
+  formatearHora(fechaHoraString: string): string {
+    if (!fechaHoraString) return '--:--';
+    
+    try { 
+      const fecha = new Date(fechaHoraString);
+      // Ajustar para problema de zona horaria
+      fecha.setMinutes(fecha.getMinutes() + fecha.getTimezoneOffset());
+      return fecha.toLocaleTimeString('es-GT', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+      });
+    } catch (e) {
+      return '--:--';
+    }
   }
 
   obtenerRangoSeleccionado() {

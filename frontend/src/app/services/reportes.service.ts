@@ -7,6 +7,9 @@ const API = environment.apiBase + '/reportes';
 
 @Injectable({ providedIn: 'root' })
 export class ReportesService {
+  obtenerAsistencia(areaSeleccionada: number, desde: any, hasta: any) {
+    throw new Error('Method not implemented.');
+  }
   constructor(private http: HttpClient) {}
 
   getAreas() {

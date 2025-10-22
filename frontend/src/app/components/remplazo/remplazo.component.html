@@ -1,0 +1,74 @@
+<div class="modal-overlay" (click)="cerrarModal()">
+  <div class="modal-content" (click)="prevenirCierre($event)">
+    <div class="modal-header">
+      <h3>🔍 Buscar Reemplazo</h3>
+      <button class="close-btn" (click)="cerrarModal()">×</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Información del turno y fecha -->
+      <div class="info-section" *ngIf="fechaSeleccionada">
+        <p><strong>Fecha:</strong> {{fechaSeleccionada | date:'fullDate'}}</p>
+        <p *ngIf="turnoId"><strong>Turno ID:</strong> {{turnoId}}</p>
+      </div>
+
+      <!-- Barra de búsqueda -->
+      <div class="search-section">
+        <input 
+          type="text" 
+          placeholder="Buscar por nombre o apellido..."
+          [(ngModel)]="busquedaReemplazo"
+          (input)="filtrarEmpleados()"
+          class="search-input"
+          [disabled]="loading" />
+      </div>
+
+      <!-- Estado de carga -->
+      <div class="loading-section" *ngIf="loading">
+        <div class="spinner"></div>
+        <p>Cargando empleados disponibles...</p>
+      </div>
+
+      <!-- Mensaje de error -->
+      <div class="error-section" *ngIf="error && !loading">
+        <div class="error-message">
+          {{error}}
+        </div>
+        <button class="btn retry-btn" (click)="cargarEmpleadosDisponibles()">
+          Reintentar
+        </button>
+      </div>
+
+      <!-- Resultados -->
+      <div class="results-section" *ngIf="!loading && !error">
+        <h4>Empleados Disponibles ({{empleadosFiltrados.length}})</h4>
+        
+        <div class="results-list" *ngIf="empleadosFiltrados.length > 0">
+          <div 
+            *ngFor="let emp of empleadosFiltrados" 
+            class="empleado-item"
+            (click)="seleccionarEmpleado(emp)">
+            <div class="empleado-info">
+              <strong>{{ emp.nombre_completo }}</strong>
+              <span class="rol">{{ getRolNombre(emp.rol_id) }}</span>
+              <span class="estado disponible">✅ Disponible</span>
+            </div>
+            <div class="select-indicator">→</div>
+          </div>
+        </div>
+
+        <div class="no-results" *ngIf="empleadosFiltrados.length === 0 && busquedaReemplazo">
+          <p>No se encontraron empleados que coincidan con "{{busquedaReemplazo}}"</p>
+        </div>
+
+        <div class="no-results" *ngIf="empleadosDisponibles.length === 0 && !busquedaReemplazo">
+          <p>No hay empleados disponibles para esta fecha y turno</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn outline" (click)="cerrarModal()">Cancelar</button>
+    </div>
+  </div>
+</div>

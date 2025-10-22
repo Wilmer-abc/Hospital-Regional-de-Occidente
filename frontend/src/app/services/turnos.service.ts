@@ -62,6 +62,10 @@ export interface ApiResponse<T = any> {
 
 @Injectable({ providedIn: 'root' })
 export class TurnosService {
+guardarTurnosFijos(payload: any) {
+  return this.http.post(`${this.base}/asignaciones/fijos`, payload);
+}
+
    private API = `${environment.apiBase}/turnos`;
 
   guardarAsignaciones(payload: { asignaciones: any[] }): Observable<any> {
@@ -281,4 +285,3 @@ export class TurnosService {
     }
 
 }
-
