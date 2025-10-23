@@ -12,13 +12,13 @@ const empleadosRouter = require('./src/routes/empleados.routes.js');
 const rolesRoutes     = require('./src/routes/roles.routes.js');
 const areasRoutes     = require('./src/routes/areas.routes.js');
 const dashboardRouter = require('./src/routes/dashboard.routes.js');
-const turnosRoutes = require('./src/routes/turnos.routes.js');
+const turnosRoutes    = require('./src/routes/turnos.routes.js');
 const asignacionesRoutes = require('./src/routes/asignaciones.routes.js');
-const attachActor = require('./src/middlewares/actor.js');
-const auditRouter = require('./src/routes/audit.routes.js');
-const reportesRouter = require('./src/routes/reportes.routes.js');
+const attachActor     = require('./src/middlewares/actor.js');
+const auditRouter     = require('./src/routes/audit.routes.js');
+const reportesRouter  = require('./src/routes/reportes.routes.js');
 const notificacioinesRouter = require('./src/routes/notificacioines.routes.js');
-const reportesRoutes = require('./src/routes/reportes.routes.js');
+const reportesRoutes  = require('./src/routes/reportes.routes.js');
 
 
 const app = express();
