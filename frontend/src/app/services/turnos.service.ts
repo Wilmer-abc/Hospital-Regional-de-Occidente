@@ -266,7 +266,7 @@ guardarTurnosFijos(payload: any) {
       return this.http.post<any>(this.API, turno);
     }
 
-    eliminarTurno(id: number) {
+    eliminarTurno(id: number) {  
       return this.http.delete<any>(`${this.API}/${id}`); 
     }
 
@@ -283,5 +283,8 @@ guardarTurnosFijos(payload: any) {
         { headers }
       );
     }
+
+  // Las funciones relacionadas con reemplazos (getEmpleadosDisponiblesParaReemplazo,
+  // solicitarReemplazo, confirmarReemplazo) ya están implementadas anteriormente en esta clase.
 
 }

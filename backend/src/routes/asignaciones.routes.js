@@ -107,17 +107,6 @@ router.post("/generar-calendario", async (req, res) => {
   }
 });
 
-router.get("/reemplazos/disponibles", async (req, res) => {
-  try {
-    const { fecha, turno_id } = req.query;
-    
-    const empleadosDisponibles = await buscarEmpleadosDisponiblesParaReemplazo(fecha, turno_id);
-    
-    res.json({ success: true, data: empleadosDisponibles });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
 
 
 router.get('/empleado/:id/calendario', requireAuth, async (req, res) => {
@@ -166,18 +155,6 @@ router.get('/empleado/:id/calendario', requireAuth, async (req, res) => {
 });
 
 
-router.post("/reemplazos/solicitar", async (req, res) => {
-  try {
-    const { dia_trabajo_id, empleado_original_id, empleado_reemplazo_id, motivo } = req.body;
-    
-    await solicitarReemplazo(dia_trabajo_id, empleado_original_id, empleado_reemplazo_id, motivo);
-    
-    res.json({ success: true, message: "Reemplazo solicitado correctamente" });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
 // Funciones auxiliares
 async function generarCalendarioRotativo(empleadosIds, fechaInicio, fechaFin, tipoTurno, config) {
   const calendario = [];
@@ -214,15 +191,31 @@ async function generarCalendarioRotativo(empleadosIds, fechaInicio, fechaFin, ti
   return calendario;
   }
 
-  async function buscarEmpleadosDisponiblesParaReemplazo(fecha, turnoId) {
-    // Lógica para buscar empleados disponibles
+  async function buscarEmpleadosDisponiblesParaReemplazo(fecha, turnoId = null) {
     const [empleados] = await db.query(`
-      SELECT e.* FROM empleados e
-      LEFT JOIN asignacion_turnos at ON e.id = at.empleado_id AND at.fecha = ?
-      WHERE e.activo = 1 AND at.id IS NULL
+      SELECT 
+        e.id,
+        e.nombre_completo,
+        e.email,
+        e.rol_id,
+        e.area_id,
+        ar.nombre_area
+      FROM empleados e
+      LEFT JOIN areas ar ON e.area_id = ar.id
+      WHERE e.activo = 1
+        -- 🔸 No debe tener asignaciones que cubran la fecha seleccionada
+        AND e.id NOT IN (
+          SELECT a.empleado_id
+          FROM asignacion_turnos a
+          WHERE ? BETWEEN a.fecha_inicio AND a.fecha_fin
+            AND a.eliminado_en IS NULL
+        )
+        -- 🔸 Solo empleados sin área o sin asignación vigente
+        AND (e.area_id IS NULL OR e.area_id = 0)
+      ORDER BY e.nombre_completo ASC
     `, [fecha]);
-    
-    return empleados; 
+
+    return empleados;
   }
 
     // ========================= CREAR ASIGNACIONES EN BULK =========================
@@ -271,7 +264,7 @@ async function generarCalendarioRotativo(empleadosIds, fechaInicio, fechaFin, ti
 
         await conn.commit();
 
-        // =================== 📧 AGRUPAR Y ENVIAR CORREOS ===================
+        //  AGRUPAR Y ENVIAR CORREOS
         const empleadosMap = new Map();
 
         for (const a of asignacionesUnicas) {
@@ -378,6 +371,41 @@ async function generarCalendarioRotativo(empleadosIds, fechaInicio, fechaFin, ti
               error: err.message
             });
           }
+
+          for (const asignacion of asignacionesEmpleado) {
+            if (asignacion.esReemplazo) {
+              const [reemplazo] = await conn.query(
+                'SELECT nombre_completo, email FROM empleados WHERE id = ?',
+                [asignacion.empleado_id]
+              );
+
+              if (reemplazo.length && reemplazo[0].email) {
+                const html = plantillaAsignacionReemplazo(
+                  reemplazo[0],
+                  {
+                    nombre: asignacion.nombre_turno,
+                    hora_inicio: asignacion.hora_inicio,
+                    hora_fin: asignacion.hora_fin
+                  },
+                  asignacion,
+                  { nombre: emp.area_nombre },
+                  jefe,
+                  { nombre_completo: emp.empleado_nombre }
+                );
+
+                await sendEmail(
+                  reemplazo[0].email,
+                  '🔄 Asignación de reemplazo',
+                  html
+                );
+
+                console.log(`📧 Correo de reemplazo enviado a: ${reemplazo[0].email}`);
+              } else {
+                console.warn(`⚠️ Reemplazo ${asignacion.empleado_id} sin correo registrado`);
+              }
+            }
+          }
+          
         }
 
         // ✅ Respuesta final
@@ -538,6 +566,155 @@ async function generarCalendarioRotativo(empleadosIds, fechaInicio, fechaFin, ti
       if (conn) conn.release();
     }
   });
+
+    // ========================= EMPLEADOS DISPONIBLES PARA REEMPLAZO =========================
+    router.get("/reemplazos/disponibles", async (req, res) => {
+      try {
+        const { fecha, turno_id } = req.query;
+
+        if (!fecha) {
+          return res.status(400).json({ success: false, message: "Falta la fecha" });
+        }
+
+        console.log("📅 Buscando empleados disponibles para:", fecha, "Turno:", turno_id || "—");
+
+        // 🔹 Nueva lógica:
+        // 1) Solo empleados activos
+        // 2) Que no tengan asignación para ese día (fecha entre fecha_inicio y fecha_fin)
+        // 3) Que no estén asignados a otra área (solo disponibles o sin área)
+        const [rows] = await db.query(`
+          SELECT 
+            e.id, e.nombre_completo, e.email, e.rol_id, e.area_id, ar.nombre_area
+          FROM empleados e
+          LEFT JOIN areas ar ON e.area_id = ar.id
+          WHERE e.activo = 1
+            AND e.id NOT IN (
+              SELECT a.empleado_id
+              FROM asignacion_turnos a
+              WHERE ? BETWEEN a.fecha_inicio AND a.fecha_fin
+                AND a.eliminado_en IS NULL
+            )
+            AND (e.area_id IS NULL OR e.area_id = 0)
+          ORDER BY e.nombre_completo ASC;
+        `, [fecha]);
+
+        console.log(`✅ ${rows.length} empleados disponibles encontrados`);
+        res.json({ success: true, data: rows });
+
+      } catch (error) {
+        console.error("❌ Error en /reemplazos/disponibles:", error.message);
+        res.status(500).json({ success: false, message: error.message });
+      }
+    });
+
+    // ========================= SOLICITAR REEMPLAZO =========================
+    router.post("/reemplazos/solicitar", async (req, res) => {
+      let conn;
+      try {
+        const { empleado_original_id, empleado_reemplazo_id, fechas, turno_id } = req.body;
+
+        if (!empleado_original_id || !empleado_reemplazo_id || !fechas?.length || !turno_id) {
+          return res.status(400).json({ 
+            success: false, 
+            message: "Datos incompletos: empleado_original_id, empleado_reemplazo_id, fechas y turno_id son requeridos" 
+          });
+        }
+
+        console.log("🔄 Solicitando reemplazo:", {
+          empleado_original_id,
+          empleado_reemplazo_id,
+          fechas,
+          turno_id
+        });
+
+        conn = await db.getConnection();
+        await conn.beginTransaction();
+
+        // 🔹 Buscar datos de los empleados y turno
+        const [[reemplazo]] = await db.query(
+          "SELECT id, nombre_completo, email FROM empleados WHERE id = ?", 
+          [empleado_reemplazo_id]
+        );
+        
+        const [[reemplazado]] = await db.query(
+          "SELECT id, nombre_completo FROM empleados WHERE id = ?", 
+          [empleado_original_id]
+        );
+        
+        const [[turno]] = await db.query(
+          "SELECT id, nombre_turno AS nombre, hora_inicio, hora_fin FROM turnos WHERE id = ?", 
+          [turno_id]
+        );
+
+        if (!reemplazo || !reemplazado || !turno) {
+          await conn.rollback();
+          return res.status(400).json({ 
+            success: false, 
+            message: "No se encontraron los datos necesarios para el reemplazo" 
+          });
+        }
+
+        // 🔹 Insertar asignaciones de reemplazo para cada fecha
+        const asignacionesCreadas = [];
+        for (const fecha of fechas) {
+          const [result] = await conn.query(`
+            INSERT INTO asignacion_turnos (empleado_id, turno_id, fecha_inicio, fecha_fin, creado_por)
+            VALUES (?, ?, ?, ?, ?)
+          `, [empleado_reemplazo_id, turno_id, fecha, fecha, req.user?.id || null]);
+          
+          asignacionesCreadas.push({
+            id: result.insertId,
+            fecha: fecha
+          });
+        }
+
+        await conn.commit();
+
+        console.log(`✅ Reemplazo creado: ${asignacionesCreadas.length} asignaciones para ${reemplazo.nombre_completo}`);
+
+        // 🔹 Enviar correo de notificación usando la plantilla existente
+        try {
+          const html = plantillaAsignacionReemplazo(
+            reemplazo,
+            turno,
+            { 
+              fecha_inicio: fechas[0], 
+              fecha_fin: fechas[fechas.length - 1] 
+            },
+            null,
+            null,
+            reemplazado
+          );
+
+          await sendEmail(
+            reemplazo.email, 
+            "🔄 Asignación de reemplazo - Hospital Regional", 
+            html
+          );
+          
+          console.log(`📧 Correo enviado a: ${reemplazo.email}`);
+        } catch (emailError) {
+          console.error("❌ Error enviando correo:", emailError);
+          // No fallar la operación principal por error de email
+        }
+
+        res.json({ 
+          success: true, 
+          message: "Reemplazo asignado y notificado correctamente",
+          asignaciones_creadas: asignacionesCreadas.length
+        });
+
+      } catch (error) {
+        if (conn) await conn.rollback();
+        console.error("❌ Error en /reemplazos/solicitar:", error);
+        res.status(500).json({ 
+          success: false, 
+          message: error.message 
+        });
+      } finally {
+        if (conn) conn.release();
+      }
+    });
 
 
       // =================== 📅 OBTENER ASIGNACIONES EXISTENTES DE UN EMPLEADO ===================

@@ -33,6 +33,7 @@ export class CalendarioTurnosComponent implements OnInit {
   @Input() turnosDisponibles: any[] = [];
   @Input() fechaInicio!: string;
   @Input() fechaFin!: string;
+  @Input() modoReemplazoActivo: boolean = false;
 
   @Output() asignacionesGuardadas = new EventEmitter<any>();
   @Output() turnoAsignado = new EventEmitter<any>();
@@ -55,6 +56,20 @@ export class CalendarioTurnosComponent implements OnInit {
 
   filtroActivo: string = 'todos';
   asignacionesPendientes: any[] = [];
+
+  empleadoReemplazo: any = null;
+  empleadoOriginal: any = null;
+  turnoIdReemplazo: number | null = null;
+
+  activarModoReemplazo(event: any) {
+    this.modoReemplazoActivo = true;
+    this.empleadoReemplazo = event.empleadoReemplazo;
+    this.empleadoOriginal = event.empleadoOriginal;
+    this.turnoIdReemplazo = event.turnoId;
+
+    alert(`Seleccione los días que ${this.empleadoReemplazo.nombre_completo} cubrirá a ${this.empleadoOriginal.nombre_completo}`);
+  }
+
 
   constructor(private turnosService: TurnosService) {
     const hoy = new Date();
@@ -121,6 +136,15 @@ export class CalendarioTurnosComponent implements OnInit {
     this.diasCalendario = [...this.diasCalendario];
   }
 
+  onDiaClick(dia: any) {
+  if (this.modoReemplazoActivo) {
+    dia.seleccionadoParaReemplazo = !dia.seleccionadoParaReemplazo;
+  } else {
+    // comportamiento normal
+  }
+}
+
+
    limpiarAsignacionesPrevias() {
     this.diasCalendario.forEach(dia => {
       dia.asignado = false;
@@ -132,9 +156,6 @@ export class CalendarioTurnosComponent implements OnInit {
       );
     });
   }
-
-
-
 
   get nombreMes(): string {
     return this.meses[this.mesActual];
@@ -263,41 +284,61 @@ export class CalendarioTurnosComponent implements OnInit {
   }
 
   confirmarAsignacion() {
-    if (this.turnoSeleccionado && this.empleadoId) {
-      const turnoSeleccionado = this.turnosDisponibles.find(t => t.id === this.turnoSeleccionado);
-      if (!turnoSeleccionado) {
-        console.error('Turno no encontrado. ID:', this.turnoSeleccionado);
-        return;
-      }
+    const empleado = this.equipo.find(e => e.id === this.empleadoId);
+    const nombreEmpleado = empleado ? empleado.nombre_completo : 'Empleado';
 
-      const nuevaAsignacion = {
-        fecha_inicio: this.fechaSeleccionada,  
-        fecha_fin: this.fechaSeleccionada,     
-        fecha: this.fechaSeleccionada,         
-        empleado_id: this.empleadoId,
-        turno_id: this.turnoSeleccionado,
-        hora_entrada: turnoSeleccionado.hora_inicio,
-        hora_salida: turnoSeleccionado.hora_fin,
-        estado: "ASIGNADO" as "ASIGNADO",
-        necesita_reemplazo: false,
-        nombreEmpleado: this.getNombreEmpleado(this.empleadoId)
-      };
+    const horaInicio = this.getHoraInicio(this.turnoSeleccionado);
+    const horaFin = this.getHoraFin(this.turnoSeleccionado);
+    const nombreTurno = this.turnosDisponibles.find(t => t.id === this.turnoSeleccionado)?.nombre_turno
+      || this.turnosDisponibles.find(t => t.id === this.turnoSeleccionado)?.nombre
+      || 'Turno asignado';
 
-      // Actualizar visualmente el calendario
-      const dia = this.diasCalendario.find(d => d.fecha === this.fechaSeleccionada);
-      if (dia) {
-        dia.asignaciones = [nuevaAsignacion];
-      }
+    // Construir objeto con los campos requeridos por DiaTrabajo
+    const asignacion: any = {
+      empleado_id: this.empleadoId,
+      nombreEmpleado: nombreEmpleado,
+      turno_id: this.turnoSeleccionado,
+      fecha: this.fechaSeleccionada,
+      fecha_inicio: this.fechaSeleccionada,
+      hora_entrada: horaInicio,
+      hora_salida: horaFin,
+      necesita_reemplazo: this.modoReemplazoActivo,
+      estado: 'PENDIENTE',
+      nombre_turno: nombreTurno,
+      esReemplazo: this.modoReemplazoActivo
+    };
 
-      // Emitir evento al componente padre
-      this.turnoAsignado.emit(nuevaAsignacion);
+    console.log('🧩 Nueva asignación:', asignacion);
 
-      // Guardar en asignaciones pendientes
-      this.asignacionesPendientes.push(nuevaAsignacion);
-
-      this.cerrarModal();
+    // Agregar la asignación al día seleccionado
+    const dia = this.diasCalendario.find(d => d.fecha === this.fechaSeleccionada);
+    if (dia) {
+      dia.asignaciones.push(asignacion);
+      // forzar actualización si es necesario
+      this.diasCalendario = [...this.diasCalendario];
     }
+
+    // Agregar a pendientes para luego guardar en backend (usa fecha_inicio/fecha_fin)
+    this.asignacionesPendientes.push({
+      empleado_id: this.empleadoId,
+      turno_id: this.turnoSeleccionado,
+      fecha_inicio: this.fechaSeleccionada,
+      fecha_fin: this.fechaSeleccionada
+    });
+
+    this.mostrarModalAsignacion = false;
   }
+  getHoraFin(turnoSeleccionado: number | undefined): string | undefined {
+    if (!turnoSeleccionado) return undefined;
+    const turno = this.turnosDisponibles.find(t => t.id === turnoSeleccionado);
+    return turno?.hora_fin ?? turno?.horaFin ?? turno?.hora_finario ?? undefined;
+  }
+  getHoraInicio(turnoSeleccionado: number | undefined): string | undefined {
+    if (!turnoSeleccionado) return undefined;
+    const turno = this.turnosDisponibles.find(t => t.id === turnoSeleccionado);
+    return turno?.hora_inicio ?? turno?.horaInicio ?? turno?.hora_inicioario ?? undefined;
+  }
+
 
   guardarAsignaciones() {
     if (this.asignacionesPendientes.length === 0) {

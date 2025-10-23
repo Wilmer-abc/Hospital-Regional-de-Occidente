@@ -6,6 +6,8 @@ import { environment } from '../../../environments/environment';
 import { TurnosService } from '../../services/turnos.service';
 import { CalendarioTurnosComponent } from '../calendario-turnos/calendario-turnos.component';
 import { EmpleadosService } from '../../services/empleados.service';
+import { RemplazoComponent } from '../reemplazo/remplazo.component';
+
 
 const API = environment.apiBase;
 
@@ -49,16 +51,6 @@ interface Rol {
   nivel?: number;
 }
 
-interface Reemplazo {
-  id: number;
-  empleadoId: number;
-  reemplazoId: number | null;
-  fechaInicio: string;
-  fechaFin: string;
-  motivo?: string;
-  diaTrabajoId?: number;
-}
-
 interface NuevoTurno {
   nombre: string;
   hora_inicio: string;
@@ -80,7 +72,7 @@ interface Asignacion {
 @Component({
   selector: 'app-asignar-turnos',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, CalendarioTurnosComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, CalendarioTurnosComponent, RemplazoComponent],
   templateUrl: './asignar-turnos.component.html',
   styleUrls: ['./asignar-turnos.component.scss']
 })
@@ -97,6 +89,8 @@ export class AsignarTurnosComponent implements OnInit {
   turnoSeleccionadoGlobal: number | null = null;
   fijoFormData = { fecha_inicio: '', fecha_fin: '' };
   descansoGrupal: boolean[] = [false, false, false, false, false, false, false];
+  modoReemplazoActivo: boolean = false;
+
   // ===== Estado general =====
   loading = false;
   error: string | null = null;
@@ -118,7 +112,7 @@ export class AsignarTurnosComponent implements OnInit {
   auxEnfermeriaSeleccionados: any[] = [];
   auxHospitalSeleccionadosData: any[] = [];
   empleadoCalendarioSeleccionado?: number;
-
+  EmpleadoSeleccionado: any;
   // ===== Inyecciones =====
   private turnosService = inject(TurnosService);
   private fb = inject(FormBuilder);
@@ -163,6 +157,12 @@ export class AsignarTurnosComponent implements OnInit {
   fechaFinFijo: string | undefined;
   areaSeleccionada: any;
   jefeSeleccionado: any;
+  reemplazos: any[] = [];
+  calendarioComponent: any;
+  mostrarModalReemplazo: boolean = false;
+  reemplazoActivo: any;
+  empleadoOriginal: any;
+  turnoId: any;
 
   // Reemplaza el getter turnosDisponibles por este:
     get turnosDisponibles(): Turno[] {
@@ -190,15 +190,6 @@ export class AsignarTurnosComponent implements OnInit {
   filtroBusqueda: string = '';
   filtroRol: string | null = null;
   equipoCompleto: Empleado[] = [];
-
-  // ===== Reemplazos =====
-  reemplazos: Reemplazo[] = [];
-  reemplazoActual: Reemplazo | null = null;
-  mostrarModalReemplazos = false;
-  busquedaReemplazo: string = '';
-  empleadosDisponiblesReemplazo: Empleado[] = [];
-  empleadoReemplazoSeleccionado: Empleado | null = null;
-  empleadosFiltradosReemplazo: Empleado[] = [];
 
   // ===== Asignaciones individuales (desde calendario-turnos) =====
   asignaciones: Record<number, any[]> = {};
@@ -420,6 +411,14 @@ guardarTurnosFijos() {
     }
   });
 }
+
+  onReemplazoSeleccionado(event: any) {
+    console.log('👥 Reemplazo seleccionado:', event);
+
+    // Pasar el reemplazo al calendario
+    this.calendarioComponent.activarModoReemplazo(event);
+  }
+
 
 
 
@@ -679,38 +678,36 @@ abrirFormulario(id: any) {
     }
   }
 
-  // Abrir modal con lista de empleados
-  abrirModalReemplazo(empleadoId: number) {
-    this.mostrarModalReemplazos = true;
-    this.busquedaReemplazo = '';
+  abrirModalReemplazo(empleado: any) {
+    this.EmpleadoSeleccionado = empleado;
+    this.mostrarModalReemplazo  = true;
+  }
 
-    // Cargar empleados disponibles (excepto el que será reemplazado)
-    this.empleadosDisponiblesReemplazo = this.empleados.filter(emp =>
-      emp.activo && emp.id !== empleadoId
+
+  // Manejar reemplazo confirmado
+  onReemplazoConfirmado(event: any) {
+    console.log('🔄 Reemplazo confirmado:', event);
+
+    // Guardar temporalmente los datos del reemplazo
+    this.reemplazoActivo = event.empleadoReemplazo;
+    this.empleadoOriginal = event.empleadoOriginal;
+    this.turnoId = event.turnoId;
+
+    // Actualizar el ID del empleado en el calendario dinámicamente
+    this.empleadoCalendarioSeleccionado = this.reemplazoActivo.id;
+
+    // Mostrar aviso
+    this.info = `✅ ${event.empleadoReemplazo.nombre_completo} cubrirá el turno de ${event.empleadoOriginal.nombre_completo}. 
+    Ahora selecciona los días en el calendario que este empleado cubrirá.`;
+
+    // Recargar las asignaciones para el calendario (modo reemplazo)
+    this.cargarAsignacionesEquipoCompleto(
+      this.fechasForm.controls.fecha_inicio.value || '',
+      this.fechasForm.controls.fecha_fin.value || ''
     );
 
-    // Inicialmente mostrar todos
-    this.empleadosFiltradosReemplazo = [...this.empleadosDisponiblesReemplazo];
+    this.reemplazoActivo = true;
   }
-  
-  cerrarModalReemplazos() {
-    this.mostrarModalReemplazos = false;
-    this.busquedaReemplazo = '';
-  }
-
-  filtrarEmpleadosReemplazo() {
-    const term = this.busquedaReemplazo.toLowerCase().trim();
-
-    if (!term) {
-      this.empleadosFiltradosReemplazo = [...this.empleadosDisponiblesReemplazo];
-      return;
-    }
-
-    this.empleadosFiltradosReemplazo = this.empleadosDisponiblesReemplazo.filter(emp =>
-      emp.nombre_completo.toLowerCase().includes(term)
-    );
-  }
-
 
   // MODIFICA el método cancelarFormulario para limpiar correctamente:
   cancelarFormulario() {
@@ -938,29 +935,29 @@ abrirFormulario(id: any) {
   }
 
   // ===== Reemplazos =====
-  agregarReemplazo() {
-    const nuevo: Reemplazo = {
-      id: Date.now(),
-      empleadoId: this.equipoCompleto[0]?.id || 0,
-      reemplazoId: null,
-      fechaInicio: new Date().toISOString().split('T')[0],
-      fechaFin: new Date().toISOString().split('T')[0]
-    };
-    this.reemplazos.push(nuevo);
-  }
+  // agregarReemplazo() {
+  //   const nuevo: Reemplazo = {
+  //     id: Date.now(),
+  //     empleadoId: this.equipoCompleto[0]?.id || 0,
+  //     reemplazoId: null,
+  //     fechaInicio: new Date().toISOString().split('T')[0],
+  //     fechaFin: new Date().toISOString().split('T')[0]
+  //   };
+  //   this.reemplazos.push(nuevo);
+  // }
 
-  eliminarReemplazo(reemplazo: Reemplazo) {
-    this.reemplazos = this.reemplazos.filter(r => r.id !== reemplazo.id);
-  }
-  asignarReemplazo(emp: Empleado) {
-    if (this.reemplazoActual) {
-      this.reemplazoActual.reemplazoId = emp.id;
-      this.reemplazoActual.motivo = 'Reemplazo manual';
-    }
-    this.mostrarModalReemplazos = false;
-    this.busquedaReemplazo = '';
-    this.info = ` ${emp.nombre_completo} asignado como reemplazo`;
-  }
+  // eliminarReemplazo(reemplazo: Reemplazo) {
+  //   this.reemplazos = this.reemplazos.filter(r => r.id !== reemplazo.id);
+  // }
+  // asignarReemplazo(emp: Empleado) {
+  //   if (this.reemplazoActual) {
+  //     this.reemplazoActual.reemplazoId = emp.id;
+  //     this.reemplazoActual.motivo = 'Reemplazo manual';
+  //   }
+  //   this.mostrarModalReemplazos = false;
+  //   this.busquedaReemplazo = '';
+  //   this.info = ` ${emp.nombre_completo} asignado como reemplazo`;
+  // }
 
     // MODIFICA el método guardarFormulario - agrega esta función al inicio:
     async guardarFormulario() {
