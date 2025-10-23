@@ -56,11 +56,11 @@
           *ngFor="let conf of (vista==='LISTA_ROTATIVOS' ? configuracionesRotativas : configuracionesFijas)"
           (click)="abrirFormulario(conf.id)">
         <button class="delete-conf-btn" (click)="eliminarConfiguracion(conf, vista); $event.stopPropagation()">×</button>
-        <div class="option-icon">{{ vista==='LISTA_ROTATIVOS' ? '🔄' : '⏱️' }}</div>
+        <div class="option-icon">{{ vista==='LISTA_ROTATIVOS' ? '🔄' : '📌' }}</div>
         <h3>{{ conf.areaNombre }}</h3>
-        <p>👨‍💼 {{ conf.jefeNombre }} | 👥 {{ conf.empleadosCount }} empleados</p>
+        <p>👨‍💼 {{ conf.jefeNombre }} | 👩🏻‍🤝‍🧑🏽 {{ conf.empleadosCount }} empleados</p>
         <p *ngIf="conf.tipo === 'FIJO'" style="color: #059669; font-size: 0.9rem;">
-          ⏱️ Turno Fijo
+          📌 Turno Fijo
         </p>
         <small>📅 Creado: {{ conf.fechaCreacion | date:'medium' }}</small>
       </div>
@@ -256,7 +256,7 @@
               <small>Tolerancia: {{ turno.tolerancia_entrada_minutos }}min</small>
               <small *ngIf="turno.esPersonalizado" class="personalizado">Personalizado</small>
             </div>
-            <!-- 🔥 CAMBIO: Eliminar *ngIf para mostrar siempre el botón -->
+            <!-- CAMBIO: Eliminar *ngIf para mostrar siempre el botón -->
             <button class="btn small danger" (click)="eliminarTurno(turno.id)">Eliminar</button>
           </div>
         </div>
@@ -283,7 +283,7 @@
           <!-- En el paso 4 del formulario rotativo - BUSCA ESTA SECCIÓN -->
           <div class="selector-empleado" *ngIf="equipoCompleto.length > 0">
             <label>Seleccionar empleado:
-              <!-- 🔥 AGREGAR (change)="onEmpleadoCalendarioChange()" -->
+              <!-- AGREGAR (change)="onEmpleadoCalendarioChange()" -->
               <select [(ngModel)]="empleadoCalendarioSeleccionado" 
                       (change)="onEmpleadoCalendarioChange()">
                 <option [ngValue]="null">-- Seleccionar empleado --</option>
@@ -403,7 +403,7 @@
               <small>Tolerancia: {{ turno.tolerancia_entrada_minutos }}/{{ turno.tolerancia_salida_minutos }}min</small>
               <small *ngIf="turno.esPersonalizado" class="personalizado">Personalizado</small>
             </div>
-            <!-- 🔥 CAMBIO: Eliminar *ngIf para mostrar siempre el botón -->
+            <!-- CAMBIO: Eliminar *ngIf para mostrar siempre el botón -->
             <button class="btn small danger" (click)="eliminarTurno(turno.id)">Eliminar</button>
           </div>
         </div>

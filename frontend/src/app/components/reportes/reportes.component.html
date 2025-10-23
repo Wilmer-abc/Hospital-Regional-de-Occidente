@@ -55,6 +55,7 @@
             <th>Cargo</th>
             <th>Fecha</th>
             <th>Turno</th>
+            <th>Tipo Turno</th>
             <th>Entrada Prog.</th>
             <th>Salida Prog.</th>
             <th>Entrada Real</th>
@@ -71,6 +72,11 @@
             <td>{{ r.cargo }}</td>
             <td>{{ r.fecha | date: 'dd/MM/yyyy' }}</td>
             <td>{{ r.turno_asignado || 'N/A' }}</td> 
+            <td>
+            <span [class]="r.tipo_turno === 'FIJO' ? 'badge-fijo' : 'badge-rotativo'">
+                {{ r.tipo_turno || 'N/A' }}
+              </span>
+            </td>
             <td>{{ r.hora_entrada_programada || 'N/A' }}</td>
             <td>{{ r.hora_salida_programada || 'N/A' }}</td>
             <td [class.estado-presente]="r.entrada_real" [class.estado-ausente]="!r.entrada_real">
