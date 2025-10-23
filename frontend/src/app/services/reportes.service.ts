@@ -23,4 +23,6 @@ export class ReportesService {
       .set('hasta', hasta);
     return this.http.get<any>(`${API}/asistencia`, { params });
   }
+
+  
 }
