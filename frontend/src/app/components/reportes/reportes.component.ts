@@ -101,12 +101,16 @@ generarReporte() {
   });
 }
 
-obtenerResumen() {
-  const total = this.registros.length;
-  const presentes = this.registros.filter(r => r.estado_dia === 'Presente').length;
-  const ausentes = this.registros.filter(r => r.estado_dia === 'Ausente').length;
-  return { total, presentes, ausentes };
-}
+  obtenerResumen() {
+    const total = this.registros.length;
+    const presentes = this.registros.filter(r => 
+      r.estado_dia === 'Presente' || 
+      (r.entrada_real && r.estado_dia !== 'Ausente')
+    ).length;
+    const ausentes = total - presentes;
+    
+    return { total, presentes, ausentes };
+  }
 
   // MÉTODOS NUEVOS PARA LAS CLASES DINÁMICAS
   getCumplimientoClass(cumplimiento: string): string {
@@ -129,109 +133,133 @@ obtenerResumen() {
     return '';
   }
 
-  descargarPDF() {
-    if (this.registros.length === 0) {
-      alert('No hay datos para exportar.');
-      return;
+descargarPDF() {
+  if (this.registros.length === 0) {
+    alert('No hay datos para exportar.');
+    return;
+  }  
+
+  // ✅ Validación mejorada del área seleccionada
+  if (!this.areaSeleccionada) {
+    console.error('No hay área seleccionada para el PDF');
+    alert('Error: No se ha seleccionado un área válida.');
+    return;
+  }
+
+  let nombreArea = this.obtenerNombreArea();
+  console.log('Nombre del área para PDF:', nombreArea);
+
+  // ✅ Fallback: si no se encuentra el área, usar el área del primer registro
+  if (nombreArea === 'Área no encontrada' && this.registros.length > 0) {
+    nombreArea = this.registros[0].area || 'Área_Desconocida';
+    console.log('Usando nombre del primer registro:', nombreArea);
+  }
+
+  // ✅ Preparar datos para el PDF
+  const doc = new jsPDF('l', 'mm', 'a4');
+  const logo = new Image();
+  logo.src = 'assets/logo-hospital.png';
+
+  const fechaGen = new Date().toLocaleDateString('es-GT');
+  const rango = this.obtenerRangoSeleccionado();
+  const resumen = this.obtenerResumen();
+
+  // ✅ Nombre del archivo limpio y seguro
+  const nombreArchivo = `Reporte_${nombreArea.replace(/\s+/g, '_')}_${fechaGen.replace(/\//g, '-')}.pdf`;
+  console.log('Nombre del archivo generado:', nombreArchivo);
+
+  logo.onload = () => {
+    // --- Encabezado ---
+    doc.setFontSize(10);
+    try {
+      doc.addImage(logo, 'PNG', 14, 8, 25, 25);
+    } catch (e) {
+      console.warn('No se pudo cargar el logo, continuando sin imagen...');
     }
 
-    const doc = new jsPDF('l', 'mm', 'a4');
-    const logo = new Image();
-    logo.src = 'assets/logo-hospital.png';
+    doc.setFont('helvetica', 'bold');
+    doc.text('Hospital Regional de Occidente', 45, 15);
+    doc.setFontSize(12);
+    doc.text('Reporte de Asistencia por Área', 45, 23);
 
-    const fechaGen = new Date().toLocaleDateString('es-GT');
-    const area = this.obtenerNombreArea().replace(/\s+/g, '_');
-    const rango = this.obtenerRangoSeleccionado();
-    const resumen = this.obtenerResumen();
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Área: ${nombreArea}`, 14, 38);
+    doc.text(`Periodo: ${rango}`, 90, 38);
+    doc.text(`Generado: ${fechaGen}`, 200, 38);
 
-    logo.onload = () => {
-      doc.setFontSize(10);
-      try {
-        doc.addImage(logo, 'PNG', 14, 8, 25, 25);
-      } catch (e) {
-        console.warn('No se pudo cargar el logo, continuando sin imagen...');
+    doc.text(
+      `Total: ${resumen.total} | Presentes: ${resumen.presentes} | Ausentes: ${resumen.ausentes}`,
+      14,
+      45
+    );
+
+    // --- Datos de la tabla ---
+    const columnas = [
+      { header: 'Empleado', dataKey: 'empleado' },
+      { header: 'Cargo', dataKey: 'cargo' },
+      { header: 'Fecha', dataKey: 'fecha' },
+      { header: 'Turno', dataKey: 'turno_asignado' },
+      { header: 'Entrada Prog.', dataKey: 'hora_entrada_programada' },
+      { header: 'Salida Prog.', dataKey: 'hora_salida_programada' },
+      { header: 'Entrada Real', dataKey: 'entrada_real' },
+      { header: 'Salida Real', dataKey: 'salida_real' },
+      { header: 'Cumplimiento', dataKey: 'cumplimiento' },
+      { header: 'Estado', dataKey: 'estado_dia' }
+    ];
+
+    const filas = this.registros.map((r) => ({
+      empleado: r.empleado,
+      cargo: r.cargo,
+      fecha: this.formatearFecha(r.fecha),
+      turno_asignado: r.turno_asignado || 'N/A',
+      hora_entrada_programada: r.hora_entrada_programada || 'N/A',
+      hora_salida_programada: r.hora_salida_programada || 'N/A',
+      entrada_real: r.entrada_real ? this.formatearHora(r.entrada_real) : '--:--',
+      salida_real: r.salida_real ? this.formatearHora(r.salida_real) : '--:--',
+      cumplimiento: r.cumplimiento,
+      estado_dia: r.estado_dia
+    }));
+
+    autoTable(doc, {
+      columns: columnas,
+      body: filas,
+      startY: 50,
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [0, 82, 155], textColor: 255, halign: 'center' },
+      alternateRowStyles: { fillColor: [240, 240, 240] },
+      columnStyles: { 
+        cumplimiento: { halign: 'center' }, 
+        estado_dia: { halign: 'center' } 
+      },
+      didDrawPage: (data) => {
+        const pageSize = doc.internal.pageSize;
+        const pageHeight = pageSize.height || pageSize.getHeight();
+        doc.setFontSize(8);
+        doc.text(
+          `Página ${doc.getNumberOfPages()} | Generado: ${fechaGen}`,
+          14,
+          pageHeight - 5
+        );
       }
+    });
 
-      doc.setFont('helvetica', 'bold');
-      doc.text('Hospital Regional de Occidente', 45, 15);
-      doc.setFontSize(12);
-      doc.text('Reporte de Asistencia por Área', 45, 23);
+    // ✅ Guardar el PDF con el nombre correcto
+    doc.save(nombreArchivo);
+  };
 
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Área: ${this.obtenerNombreArea()}`, 14, 38);
-      doc.text(`Periodo: ${rango}`, 90, 38);
-      doc.text(`Generado: ${fechaGen}`, 200, 38);
-
-      doc.text(
-        `Total: ${resumen.total} | Presentes: ${resumen.presentes} | Ausentes: ${resumen.ausentes}`,
-        14,
-        45
-      );
-
-      const columnas = [
-        { header: 'Empleado', dataKey: 'empleado' },
-        { header: 'Cargo', dataKey: 'cargo' },
-        { header: 'Fecha', dataKey: 'fecha' },
-        { header: 'Turno', dataKey: 'turno_asignado' },
-        { header: 'Entrada Prog.', dataKey: 'hora_entrada_programada' },
-        { header: 'Salida Prog.', dataKey: 'hora_salida_programada' },
-        { header: 'Entrada Real', dataKey: 'entrada_real' },
-        { header: 'Salida Real', dataKey: 'salida_real' },
-        { header: 'Cumplimiento', dataKey: 'cumplimiento' },
-        { header: 'Estado', dataKey: 'estado_dia' }
-      ];
-
-      const filas = this.registros.map((r) => ({
-        empleado: r.empleado,
-        cargo: r.cargo,
-        fecha: this.formatearFecha(r.fecha),
-        turno_asignado: r.turno_asignado || 'N/A',
-        hora_entrada_programada: r.hora_entrada_programada || 'N/A',
-        hora_salida_programada: r.hora_salida_programada || 'N/A',
-        entrada_real: r.entrada_real ? this.formatearHora(r.entrada_real) : '--:--',
-        salida_real: r.salida_real ? this.formatearHora(r.salida_real) : '--:--',
-        cumplimiento: r.cumplimiento,
-        estado_dia: r.estado_dia
-      }));
-
-      autoTable(doc, {
-        columns: columnas,
-        body: filas,
-        startY: 50,
-        styles: { fontSize: 8, cellPadding: 2 },
-        headStyles: { fillColor: [0, 82, 155], textColor: 255, halign: 'center' },
-        alternateRowStyles: { fillColor: [240, 240, 240] },
-        columnStyles: { 
-          cumplimiento: { halign: 'center' }, 
-          estado_dia: { halign: 'center' } 
-        },
-        didDrawPage: (data) => {
-          const pageSize = doc.internal.pageSize;
-          const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
-          doc.setFontSize(8);
-          doc.text(
-            `Página ${doc.getNumberOfPages()} | Generado: ${fechaGen}`,
-            14,
-            pageHeight - 5
-          );
-        }
-      });
-
-      // ✅ NOMBRE CORREGIDO del archivo
-      const nombreArchivo = `Reporte_${area}_${fechaGen.replace(/\//g, '-')}.pdf`;
-      doc.save(nombreArchivo);
-    };
-
-    setTimeout(() => {
-      if (logo.complete) return;
+  // ✅ Fallback si el logo no carga en 500ms
+  setTimeout(() => {
+    if (!logo.complete) {
       console.warn('⚠️ Sin logo, generando PDF...');
+      // Forzar la ejecución de onload si aún no se ha ejecutado
       if (typeof logo.onload === 'function') {
         logo.onload(new Event('load'));
       }
-    }, 500);
-  }
-
+    }
+  }, 500);
+}
+ 
   // NUEVO MÉTODO para formatear fechas correctamente
   formatearFecha(fechaString: string): string {
     if (!fechaString) return 'N/A';
@@ -269,4 +297,9 @@ obtenerResumen() {
     const { desde, hasta } = this.semanaSeleccionada;
     return `${desde} a ${hasta}`;
   }
+
+  onAreaChange() {
+  console.log('Área cambiada a:', this.areaSeleccionada);
+  console.log('Área encontrada:', this.areas.find(a => a.id === this.areaSeleccionada));
+}
 }
