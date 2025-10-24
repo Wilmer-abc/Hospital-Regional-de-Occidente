@@ -6,7 +6,7 @@ cd backend = npm install nodemailer == esto para el envio de correos
 cd frontend = npm install
 cd frontend = npm install -g @angular/cli
 cd frontend = npm install jspdf jspdf-autotable
-
+cd frontend = npm install chart.js
 
 para levantar ambas carpetas 
 cd backend = npm run dev
