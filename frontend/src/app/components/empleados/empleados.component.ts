@@ -442,20 +442,31 @@ export class EmpleadosComponent implements OnInit {
   canDelete(): boolean     { return this.hasRole('rrhh', this.userInfo); }
 
   //  Métodos CRUD de Empleados
-  deactivateEmpleado(empleado: Empleado) {
-    if (!confirm(`¿Está seguro de desactivar al empleado ${empleado.nombre_completo}?`)) return;
+  deactivateEmpleado(emp: any) {
+    const accion = emp.activo ? 'desactivar' : 'activar';
+    const confirmMsg = `¿Está seguro de ${accion} al empleado ${emp.nombre_completo}?`;
 
-    this.empleadosService.deactivateEmpleado(empleado.id!).subscribe({
-      next: (response: any) => {
-        if (response.success) this.loadEmpleados();
-        else this.error = response.error || 'Error desactivando empleado';
+    if (!confirm(confirmMsg)) return;
+
+    this.loading = true;
+    const request = emp.activo
+      ? this.empleadosService.desactivarEmpleado(emp.id)
+      : this.empleadosService.activarEmpleado(emp.id);
+
+    request.subscribe({
+      next: (res: any) => {
+        alert(res.message || `Empleado ${emp.activo ? 'desactivado' : 'activado'} correctamente.`);
+        emp.activo = !emp.activo; // alterna el estado visualmente
+        this.loading = false;
       },
       error: (err) => {
-        this.error = 'Error de conexión al servidor';
-        console.error('Error:', err);
-      }
+        console.error(err);
+        alert('Error al actualizar el estado del empleado');
+        this.loading = false;
+      },
     });
   }
+
 
   deleteEmpleado(empleado: Empleado) {
     if (!confirm(`¿Está seguro de ELIMINAR PERMANENTEMENTE al empleado ${empleado.nombre_completo}? Esta acción no se puede deshacer.`)) return;
