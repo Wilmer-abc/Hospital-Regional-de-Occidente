@@ -72,6 +72,15 @@ importarDesdeBiometrico(): Observable<any> {
     return this.http.delete<ApiResponse<any>>(`${this.empleadosUrl}/${id}`);
   }
 
+  activarEmpleado(id: number) {
+    return this.http.patch(`${this.empleadosUrl}/${id}/activate`, {});
+  }
+
+  desactivarEmpleado(id: number) {
+    return this.http.delete(`${this.empleadosUrl}/${id}`);
+  }
+
+
   deleteEmpleado(id: number): Observable<ApiResponse<any>> {
     return this.http.delete<ApiResponse<any>>(`${this.empleadosUrl}/${id}/permanent`);
   }
