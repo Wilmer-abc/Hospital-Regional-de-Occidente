@@ -115,3 +115,33 @@
     min-width: auto;
   }
 }
+
+.dashboard-container {
+  background: #f8fafc;
+  padding: 1rem 2rem;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f1f3f6 100%);
+  border-radius: 1rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+  }
+}
+
+.chart-container {
+  background: #fff;
+  padding: 1rem 1.5rem;
+  border-radius: 1rem;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+  margin-top: 1rem;
+}
+
+h3 {
+  color: #007bff;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
