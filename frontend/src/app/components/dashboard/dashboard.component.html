@@ -104,26 +104,13 @@
       <canvas id="asistenciaChart" *ngIf="hasData"></canvas>
     </div>
 
-    <!-- Próximos turnos -->
-    <div class="turnos-container">
-      <h3>Próximos Turnos</h3>
+    <!-- Distribución de Personal por Área -->
+    <div class="chart-container">
+      <h3>Distribución de Personal por Área</h3>
       <div *ngIf="!hasData" class="no-data">
-        <p>No hay turnos programados</p>
+        <p>No hay datos disponibles</p>
       </div>
-      <div *ngIf="hasData">
-        <div class="turno">
-          <strong>Mañana:</strong> {{ data.proximosTurnos.manana.enfermeros }} Enfermeros,
-          {{ data.proximosTurnos.manana.medicos }} Médicos
-        </div>
-        <div class="turno">
-          <strong>Tarde:</strong> {{ data.proximosTurnos.tarde.enfermeros }} Enfermeros,
-          {{ data.proximosTurnos.tarde.medicos }} Médicos
-        </div>
-        <div class="turno">
-          <strong>Noche:</strong> {{ data.proximosTurnos.noche.enfermeros }} Enfermeros,
-          {{ data.proximosTurnos.noche.medicos }} Médicos
-        </div>
-      </div>
+      <canvas id="areaChart" *ngIf="hasData"></canvas>
     </div>
   </div>
 </div>
