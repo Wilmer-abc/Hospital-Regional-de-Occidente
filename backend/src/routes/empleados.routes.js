@@ -208,6 +208,31 @@ class EmpleadosModel {
       }
     }
 
+    static async activateEmpleado(req, res) {
+      try {
+        const { id } = req.params;
+        if (!id || isNaN(id)) return res.status(400).json({ success: false, error: 'ID inválido' });
+
+        const antes = await EmpleadosModel.getById(parseInt(id, 10));
+        if (!antes) return res.status(404).json({ success: false, error: 'Empleado no encontrado' });
+
+        await db.query(`UPDATE empleados SET activo = 1 WHERE id = ?`, [id]);
+        await audit({
+          evento: 'ACTIVATE',
+          entidad: 'empleados',
+          entidad_id: parseInt(id, 10),
+          antes,
+          despues: { ...antes, activo: 1 },
+          req
+        });
+
+        return res.json({ success: true, message: 'Empleado activado correctamente' });
+      } catch (error) {
+        return res.status(500).json({ success: false, error: 'Error activando empleado', message: error.message });
+      }
+    }
+
+
     static async deleteEmpleado(req, res) {
       try {
         const { id } = req.params;
@@ -389,5 +414,7 @@ class EmpleadosModel {
   router.put('/:id', EmpleadosController.updateEmpleado);
   router.delete('/:id', EmpleadosController.deactivateEmpleado);
   router.delete('/:id/permanent', EmpleadosController.deleteEmpleado);
+  router.patch('/:id/activate', EmpleadosController.activateEmpleado);
+
 
   module.exports = router;
