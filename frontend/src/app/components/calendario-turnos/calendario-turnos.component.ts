@@ -339,49 +339,52 @@ export class CalendarioTurnosComponent implements OnInit {
     return turno?.hora_inicio ?? turno?.horaInicio ?? turno?.hora_inicioario ?? undefined;
   }
 
-
   guardarAsignaciones() {
-    if (this.asignacionesPendientes.length === 0) {
-      alert('No hay asignaciones pendientes para guardar');
-      return;
-    }
-
-    console.log('Asignaciones pendientes antes de enviar:', this.asignacionesPendientes);
-
-    const payload = {
-      asignaciones: this.asignacionesPendientes.map(a => ({
-        empleado_id: a.empleado_id,
-        turno_id: a.turno_id,
-        fecha_inicio: a.fecha_inicio,  
-        fecha_fin: a.fecha_fin        
-      }))
-    };
-
-    console.log('Payload que se enviará al backend:', payload);
-
-    this.turnosService.guardarAsignaciones(payload).subscribe({
-      next: (res) => {
-        if (res.success) {
-          alert(' Asignaciones guardadas correctamente');
-          this.asignacionesPendientes = [];
-          this.asignacionesGuardadas.emit(this.asignacionesPendientes);
-        } else {
-          alert(`Error del servidor: ${res.message}`);
-        }
-      },
-      error: (err) => {
-        console.error('Error guardando asignaciones en servidor:', err);
-
-        if (err.status === 400) {
-          alert(`Error de validación: ${err.error.message}. Turnos inválidos: ${err.error.turnosInvalidos}`);
-        } else if (err.status === 401) {
-          alert('Error de autenticación. Por favor, inicie sesión nuevamente.');
-        } else {
-          alert('Error inesperado. Revise la consola.');
-        }
-      }
-    });
+  if (this.asignacionesPendientes.length === 0) {
+    alert('No hay asignaciones pendientes para guardar');
+    return;
   }
+
+  console.log('Asignaciones pendientes antes de enviar:', this.asignacionesPendientes);
+
+  const payload = {
+    asignaciones: this.asignacionesPendientes.map(a => ({
+      empleado_id: a.empleado_id,
+      turno_id: a.turno_id,
+      fecha_inicio: a.fecha_inicio,
+      fecha_fin: a.fecha_fin
+    }))
+  };
+
+  console.log('Payload que se enviará al backend:', payload);
+
+  this.turnosService.guardarAsignaciones(payload).subscribe({
+    next: (res) => {
+      if (res.success) {
+        alert('Asignaciones guardadas correctamente');
+
+        // ✅ Emitir ANTES de limpiar
+        this.asignacionesGuardadas.emit([...this.asignacionesPendientes]);
+
+        // Luego limpiar
+        this.asignacionesPendientes = [];
+      } else {
+        alert(`Error del servidor: ${res.message}`);
+      }
+    },
+    error: (err) => {
+      console.error('Error guardando asignaciones en servidor:', err);
+      if (err.status === 400) {
+        alert(`Error de validación: ${err.error.message}. Turnos inválidos: ${err.error.turnosInvalidos}`);
+      } else if (err.status === 401) {
+        alert('Error de autenticación. Por favor, inicie sesión nuevamente.');
+      } else {
+        alert('Error inesperado. Revise la consola.');
+      }
+    }
+  });
+}
+
 
   cerrarModal() {
     this.mostrarModalAsignacion = false;
