@@ -120,6 +120,19 @@ router.get('/summary', requireAuth, requireRRHHorJefe, async (_req, res) => {
         AND tipo_evento = 'ENTRADA'
       GROUP BY DATE(fecha_hora)
     `);
+
+    // 11) Distribución de personal por área
+    const [distribucionArea] = await db.query(`
+      SELECT 
+        IFNULL(a.nombre_area, 'Sin área') AS area,
+        COUNT(e.id) AS cantidad
+      FROM empleados e
+      LEFT JOIN areas a ON a.id = e.area_id
+      WHERE e.eliminado_en IS NULL
+      GROUP BY a.nombre_area
+      ORDER BY cantidad DESC
+    `);
+
     
     const map = new Map(asistRaw.map(r => [r.dia.toISOString?.() ? r.dia.toISOString().slice(0,10) : String(r.dia), r.entradas]));
     const asistenciaSemanal = days.map(d => ({ fecha: d, entradas: map.get(d) || 0 }));
@@ -135,10 +148,11 @@ router.get('/summary', requireAuth, requireRRHHorJefe, async (_req, res) => {
         turnosRotativos,
         personalSinTurno,
         alertas,
-        proximosTurnos: bucket,
         asistenciaSemanal,
+        distribucionArea // ✅ nuevo
       }
     });
+
   } catch (e) {
     console.error('Dashboard summary error:', e);
     res.status(500).json({ success: false, error: 'Error generando resumen' });
