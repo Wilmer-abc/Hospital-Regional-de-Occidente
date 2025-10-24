@@ -335,8 +335,6 @@ class EmpleadosModel {
     }
   });
   
-
-
     function showToast(type, message) {
     // Puedes usar cualquier librería como Toastr, PrimeNG o Angular Material.
     switch (type) {
