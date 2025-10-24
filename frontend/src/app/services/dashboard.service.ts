@@ -9,6 +9,7 @@ export type ProximosTurnos = {
 };
 
 export interface DashboardSummary {
+  distribucionArea: any;
   personalActivo: number;
   personalInactivo: number;    
   personalTotal: number; 
