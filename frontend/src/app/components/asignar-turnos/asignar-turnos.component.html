@@ -53,21 +53,21 @@
 
       <!-- Configuraciones guardadas - AQUÍ SÍ aplicas el cambio -->
       <div class="option-card"
-          *ngFor="let conf of (vista==='LISTA_ROTATIVOS' ? configuracionesRotativas : configuracionesFijas)"
+          *ngFor="let conf of (vista==='LISTA_ROTATIVOS' ? configuracionesRotativas : configuracionesFijas); trackBy: trackByConfigId"
           (click)="abrirFormulario(conf.id)">
         <button class="delete-conf-btn" (click)="eliminarConfiguracion(conf, vista); $event.stopPropagation()">×</button>
         <div class="option-icon">{{ vista==='LISTA_ROTATIVOS' ? '🔄' : '📌' }}</div>
         <h3>{{ conf.areaNombre }}</h3>
-        <p>👨‍💼 {{ conf.jefeNombre }} | 👩🏻‍🤝‍🧑🏽 {{ conf.empleadosCount }} empleados</p>
+        <p>{{ conf.jefeNombre }} |  {{ conf.empleadosCount }} empleados</p>
         <p *ngIf="conf.tipo === 'FIJO'" style="color: #059669; font-size: 0.9rem;">
-          📌 Turno Fijo
+          Turno Fijo
         </p>
-        <small>📅 Creado: {{ conf.fechaCreacion | date:'medium' }}</small>
+        <small>Creado: {{ conf.fechaCreacion | date:'medium' }}</small>
       </div>
     </div>
 
     <div class="actions">
-      <button class="btn outline" (click)="vista='HOME'">⬅ Volver al inicio</button>
+      <button class="btn outline" (click)="vista='HOME'"> Volver al inicio</button>
     </div>
   </section>
 
@@ -93,14 +93,14 @@
               <select [formControl]="areaJefeForm.controls.area_id"
                       (change)="onAreaChangeRotativo(areaJefeForm.controls.area_id.value)">
                 <option [ngValue]="null">Seleccionar área...</option>
-                <option *ngFor="let a of areas" [ngValue]="a.id">{{ a.nombre }}</option>
+                <option *ngFor="let a of areas; trackBy: trackByAreaId" [ngValue]="a.id">{{ a.nombre }}</option>
               </select>
             </label>
                     
             <label>Jefe de área
               <select [formControl]="areaJefeForm.controls.jefe_id">
                 <option [ngValue]="null">Seleccionar jefe...</option>
-                <option *ngFor="let j of jefesCandidatos" [ngValue]="j.id">
+                <option *ngFor="let j of jefesCandidatos; trackBy: trackByEmpleadoId" [ngValue]="j.id">
                   {{ j.nombre_completo }} ({{ getRolNombre(j.rol_id) }})
                 </option>
               </select>
@@ -167,7 +167,7 @@
 
         <!-- En la lista de empleados disponibles, actualiza esta parte: -->
         <div class="empleados-grid">
-          <label *ngFor="let e of empleadosFiltrados" class="empleado-card"
+          <label *ngFor="let e of empleadosFiltrados; trackBy: trackByEmpleadoId" class="empleado-card"
                 [class.selected]="isEmpleadoSeleccionado(e.id)"
                 [class.not-selectable]="!isEmpleadoSeleccionable(e)">
             <input type="checkbox"
@@ -206,10 +206,11 @@
           No hay empleados disponibles que coincidan con los filtros
         </p>
 
-        <div class="actions">
-          <button class="btn outline" (click)="prevStep()">Atrás</button>
-          <button class="btn" (click)="nextStep()">Siguiente</button>
-        </div>
+       <div class="actions">
+        <button class="btn outline" (click)="cancelarFormulario(false)">Atrás</button>
+        <button class="btn outline" (click)="cancelarFormulario(true)">Cancelar</button>
+        <button class="btn" (click)="nextStep()">Siguiente</button>
+      </div>
       </section>
 
       <!-- Paso 3: Horarios y turnos -->
@@ -238,7 +239,7 @@
         <!-- Seleccionar turno global -->
         <h4>Seleccionar turno para todo el grupo</h4>
         <div *ngIf="turnosDisponibles.length > 0" class="turnos-grid">
-          <label *ngFor="let turno of turnosDisponibles" class="turno-card">
+          <label *ngFor="let turno of turnosDisponibles; trackBy: trackByTurnoId" class="turno-card">
             <input type="radio" name="turno_global" [value]="turno.id"
                   [(ngModel)]="turnoSeleccionadoGlobal">
             <strong>{{ turno.nombre }}</strong>
@@ -249,7 +250,7 @@
 
         <!-- SOLUCIÓN: Solo mostrar si hay turnos válidos -->
         <div *ngIf="turnosDisponibles.length > 0" class="turnos-grid">
-          <div *ngFor="let turno of turnosDisponibles" class="turno-card">
+          <div *ngFor="let turno of turnosDisponibles; trackBy: trackByTurnoId" class="turno-card">
             <div class="turno-info">
               <strong>{{ turno.nombre }}</strong>
               <span>{{ turno.hora_inicio }} - {{ turno.hora_fin }}</span>
@@ -262,7 +263,8 @@
         </div>
 
         <div class="actions">
-          <button class="btn outline" (click)="prevStep()">Atrás</button>
+          <button class="btn outline" (click)="cancelarFormulario(false)">Atrás</button>
+          <button class="btn outline" (click)="cancelarFormulario(true)">Cancelar</button>
           <button class="btn" (click)="nextStep()">Siguiente</button>
         </div>
       </section>
@@ -286,7 +288,7 @@
               <select [(ngModel)]="empleadoCalendarioSeleccionado" 
                       (change)="onEmpleadoCalendarioChange()">
                 <option [ngValue]="null">-- Seleccionar empleado --</option>
-                <option *ngFor="let emp of equipoCompleto" [ngValue]="emp.id">
+               <option *ngFor="let emp of equipoCompleto; trackBy: trackByEmpleadoId" [ngValue]="emp.id">
                   {{ emp.nombre_completo }} - {{ getRolNombre(emp.rol_id) }}
                 </option>
               </select>
@@ -317,17 +319,16 @@
             (asignacionesGuardadas)="recibirAsignaciones($event)"
             (turnoAsignado)="recibirAsignaciones($event)">
           </app-calendario-turnos>
->
 
           <app-remplazo 
-            (reemplazoSeleccionado)="onReemplazoSeleccionado($event)">
+             (reemplazoSeleccionado)="onReemplazoSeleccionado($event)">
           </app-remplazo>
 
-
-          <div class="actions">
-            <button class="btn outline" (click)="prevStep()">⬅ Atrás</button>
-            <button class="btn" (click)="guardarFormulario()">💾 Guardar y Finalizar</button>
-          </div>
+            <div class="actions">
+              <button class="btn outline" (click)="cancelarFormulario(false)">Atrás</button>
+              <button class="btn outline" (click)="cancelarFormulario(true)">Cancelar</button>
+              <button class="btn" (click)="guardarFormulario()">Guardar y Finalizar</button>
+            </div>
         </section>
     </ng-container>
 
@@ -341,14 +342,15 @@
           <label>Área
             <select [formControl]="fijoForm.controls.area_id" (change)="cargarEmpleadosArea()">
               <option [ngValue]="null">Seleccionar área...</option>
-              <option *ngFor="let a of areas" [ngValue]="a.id">{{ a.nombre }}</option>
+              <option *ngFor="let a of areas; trackBy: trackByAreaId" [ngValue]="a.id">{{ a.nombre }}</option>
+
             </select>
           </label>
 
           <label>Jefe de área
             <select [formControl]="fijoForm.controls.jefe_id">
               <option [ngValue]="null">Seleccionar jefe...</option>
-              <option *ngFor="let j of jefesCandidatos" [ngValue]="j.id">
+              <option *ngFor="let j of jefesCandidatos; trackBy: trackByEmpleadoId" [ngValue]="j.id">
                 {{ j.nombre_completo }} ({{ getRolNombre(j.rol_id) }})
               </option>
             </select>
@@ -382,7 +384,7 @@
         </div>
 
         <div *ngIf="turnosDisponibles.length > 0" class="turnos-grid">
-          <div *ngFor="let turno of turnosDisponibles" class="turno-card">
+          <div *ngFor="let turno of turnosDisponibles; trackBy: trackByTurnoId" class="turno-card">
             <div class="turno-info">
               <strong>{{ turno.nombre }}</strong>
               <span>{{ turno.hora_inicio }} - {{ turno.hora_fin }}</span>
@@ -396,14 +398,14 @@
 
         <!-- Empleados del area -->
         <h4>Empleados del área</h4>
-        <div *ngFor="let e of empleadosFijos" class="empleado-card">
+        <div *ngFor="let e of empleadosFijos; trackBy: trackByEmpleadoId" class="empleado-card">
           <div class="info">
             <span class="name">{{ e.nombre_completo }}</span>
             <span class="rol">{{ getRolNombre(e.rol_id) }}</span>
           </div>
           <select [(ngModel)]="e.turnoAsignado" (change)="onTurnoEmpleadoChange(e)">
             <option [ngValue]="null">— seleccionar turno —</option>
-            <option *ngFor="let t of turnosDisponibles" [ngValue]="t.id">
+            <option *ngFor="let t of turnosDisponibles; trackBy: trackByTurnoId" [ngValue]="t.id">
               {{ t.nombre }} ({{ t.hora_inicio }}–{{ t.hora_fin }})
             </option>
           </select>
@@ -413,7 +415,7 @@
         <!-- Dias de descanso -->
         <h4>Días de descanso grupal</h4>
         <div class="dias">
-          <label *ngFor="let d of diasSemana; let i = index" class="dia-checkbox">
+          <label *ngFor="let d of diasSemana; let i = index; trackBy: trackByDiaSemana" class="dia-checkbox">
             <input type="checkbox" [(ngModel)]="descansoGrupal[i]" />
             {{ d }}
           </label>
