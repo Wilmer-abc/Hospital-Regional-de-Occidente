@@ -1,7 +1,5 @@
 const { makeClient } = require('../biometric/hikvision.client.cjs');
-const mock = require('../biometric/hikvision.mock');
-
-const USE_MOCK = String(process.env.HIK_MOCK || 'true') === 'true';
+const db = require('../../db');
 
 function buildConfig(prefix) {
   return {
@@ -10,15 +8,12 @@ function buildConfig(prefix) {
     user: process.env[`${prefix}_USER`],
     pass: process.env[`${prefix}_PASS`],
     proto: process.env[`${prefix}_PROTOCOL`] || 'http',
-    timeout: process.env[`${prefix}_TIMEOUT_MS`] || 5000,
+    timeout: parseInt(process.env[`${prefix}_TIMEOUT_MS`] || '5000', 10),
   };
 }
 
-// Soportamos múltiples biométricos
-const devices = [
-  buildConfig('HIK1'),
-  buildConfig('HIK2'),
-].filter(d => d.host);
+// Soporta múltiples biométricos
+const devices = [buildConfig('HIK1'), buildConfig('HIK2')].filter(d => d.host);
 
 function getDigestClient(dev) {
   return makeClient({
@@ -28,60 +23,100 @@ function getDigestClient(dev) {
   });
 }
 
-async function pullEvents({ since, until, limit, cursor }) {
-  // TODO: Implementar llamada real al biométrico
-  // De momento devolvemos mock
-  return {
-    events: [],
-    nextCursor: null
-  };
+// ========================== TEST CONEXIÓN ==========================
+async function testConnectionAll() {
+  const results = [];
+  for (const dev of devices) {
+    try {
+      const client = getDigestClient(dev);
+      const data = await client.get('/ISAPI/AccessControl/AcsCfg/capabilities?format=json');
+      results.push({ host: dev.host, ok: true, capabilities: data });
+    } catch (err) {
+      results.push({ host: dev.host, ok: false, error: err.message });
+    }
+  }
+  return results;
 }
 
+// ========================== PULL EVENTS ==========================
+async function pullEvents({ since, until, limit }) {
+  const allEvents = [];
+
+  for (const dev of devices) {
+    try {
+      const client = getDigestClient(dev);
+      const { AcsEvent } = await client.get('/ISAPI/AccessControl/AcsEvent?format=json');
+
+      const lista = AcsEvent?.InfoList || [];
+
+      const eventos = lista.map(ev => ({
+        device: dev.host,
+        employeeNo: ev.employeeNoString,
+        name: ev.name,
+        time: ev.time,
+        eventType: ev.attendanceStatus,
+        reader: ev.cardReaderNo,
+        temperature: ev.temperature || null,
+      }));
+
+      allEvents.push(...eventos);
+    } catch (err) {
+      console.error(`Error leyendo eventos del biométrico ${dev.host}:`, err.message);
+    }
+  }
+
+  // Limita resultados
+  const eventosLimitados = limit ? allEvents.slice(0, limit) : allEvents;
+  return { events: eventosLimitados, count: eventosLimitados.length };
+}
+
+// ========================== EXPORTS ==========================
 module.exports = {
-  // otros exports que ya tengas
-  pullEvents,
+  testConnectionAll,
+  pullEvents
 };
 
+async function syncAsistenciasDesdeBiometricos() {
+  const { events } = await pullEvents({ limit: 200 });
 
+  for (const ev of events) {
+    const [rows] = await db.query('SELECT id FROM empleados WHERE numero_empleado = ?', [ev.employeeNo]);
+    if (!rows.length) continue; // si el empleado no existe en la BD, lo saltamos
 
-// Obtener solo nombres desde cada biométrico
-// async function getUserNamesFromDevice(dev) {
-//   const client = getDigestClient(dev);
-//   const body = {
-//     UserInfoSearchCond: {
-//       searchID: "1",
-//       maxResults: 50,
-//       searchResultPosition: 0
-//     }
-//   };
+    const empleado_id = rows[0].id;
+    const fecha = ev.time.split('T')[0];
+    const hora = new Date(ev.time);
+    
+    // Determinar si es entrada o salida según horario asignado
+    const [[turno]] = await db.query(`
+      SELECT t.id, t.hora_inicio, t.hora_fin, t.tolerancia_entrada_minutos, t.tolerancia_salida_minutos
+      FROM asignacion_turnos a
+      INNER JOIN turnos t ON t.id = a.turno_id
+      WHERE a.empleado_id = ? AND ? BETWEEN a.fecha_inicio AND a.fecha_fin
+      LIMIT 1;
+    `, [empleado_id, fecha]);
 
-//   try {
-//     const data = await client.postJson("/ISAPI/AccessControl/UserInfo/Search?format=json", body);
-//     const usuarios = (data?.UserInfoSearch?.UserInfo) || [];
-//     return usuarios.map(u => ({
-//       device: dev.host,
-//       numero_empleado: u.employeeNo,
-//       nombre_completo: u.name
-//     }));
-//   } catch (err) {
-//     console.error(`Error en biométrico ${dev.host}:`, err.message);
-//     return [];
-//   }
-// }
+    if (!turno) continue;
 
-// // API pública: juntar todos los biométricos
-// async function getAllUserNames() {
-//   if (USE_MOCK) {
-//     return [
-//       { device: "mock", numero_empleado: "1", nombre_completo: "Usuario Demo" },
-//       { device: "mock", numero_empleado: "2", nombre_completo: "Otro Demo" }
-//     ];
-//   }
+    const horaInicio = new Date(`${fecha}T${turno.hora_inicio}`);
+    const horaFin = new Date(`${fecha}T${turno.hora_fin}`);
+    const toleranciaEntrada = turno.tolerancia_entrada_minutos;
+    const toleranciaSalida = turno.tolerancia_salida_minutos;
 
-//   const all = await Promise.all(devices.map(getUserNamesFromDevice));
-//   return all.flat();
-// }
+    let estado = 'COMPLETO';
+    let minutos_retraso = 0;
 
-// module.exports = {
-//   getAllUserNames,
-// };
+    if (hora < horaInicio) {
+      estado = 'TEMPRANO';
+    } else if (hora > new Date(horaInicio.getTime() + toleranciaEntrada * 60000)) {
+      estado = 'TARDE';
+      minutos_retraso = Math.floor((hora - horaInicio) / 60000);
+    }
+
+    await db.query(`
+      INSERT INTO asistencias (empleado_id, fecha, turno_id, entrada_real, estado, minutos_retraso)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE salida_real = VALUES(entrada_real), estado = VALUES(estado)
+    `, [empleado_id, fecha, turno.id, hora, estado, minutos_retraso]);
+  }
+}
