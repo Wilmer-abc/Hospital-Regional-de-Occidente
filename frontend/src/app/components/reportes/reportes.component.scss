@@ -4,7 +4,7 @@
   min-height: 100vh;
 
   h2 {
-    color: #0b5ed7;
+    color: #080808;
     margin-bottom: 1.5rem;
     text-align: center;
     font-size: 2rem;
@@ -25,47 +25,55 @@
 
   .filtros {
     display: flex;
-    align-items: center;
-    gap: 1rem;
+    flex-direction: column; // Cambiado a columna
+    gap: 1.5rem; // Aumentado el gap
     margin-bottom: 2rem;
     padding: 1.5rem;
     background: white;
     border-radius: 12px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     border: 1px solid #e3e6f0;
-    flex-wrap: wrap;
 
-    label {
-      font-weight: 600;
-      color: #2d3748;
-      font-size: 0.9rem;
-      min-width: 70px;
-    }
-
-    select, input[type="month"] {
-      padding: 0.6rem 0.8rem;
-      border-radius: 8px;
-      border: 2px solid #e2e8f0;
-      background: white;
-      font-size: 0.9rem;
-      transition: all 0.3s ease;
-      min-width: 180px;
+    .filtros-superiores {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
       
-      &:focus {
-        outline: none;
-        border-color: #0b5ed7;
-        box-shadow: 0 0 0 3px rgba(11, 94, 215, 0.1);
+      label {
+        font-weight: 600;
+        color: #2d3748;
+        font-size: 0.9rem;
+        min-width: 70px;
       }
-      
-      &:hover {
-        border-color: #cbd5e0;
+
+      select, input[type="month"] {
+        padding: 0.6rem 0.8rem;
+        border-radius: 8px;
+        border: 2px solid #e2e8f0;
+        background: white;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+        min-width: 180px;
+        
+        &:focus {
+          outline: none;
+          border-color: #0b5ed7;
+          box-shadow: 0 0 0 3px rgba(11, 94, 215, 0.1);
+        }
+        
+        &:hover {
+          border-color: #cbd5e0;
+        }
       }
     }
 
     .botones-container {
       display: flex;
       gap: 0.75rem;
-      margin-left: auto;
+      justify-content: center; // Centrado
+      width: 100%;
+      margin-top: 0.5rem;
     }
 
     button {
@@ -231,12 +239,26 @@
     padding: 1rem;
     
     .filtros {
-      flex-direction: column;
-      align-items: stretch;
+      .filtros-superiores {
+        flex-direction: column;
+        align-items: stretch;
+        
+        .filtro-group {
+          width: 100%;
+          
+          select, input[type="month"] {
+            min-width: 100%;
+          }
+        }
+      }
       
       .botones-container {
-        margin-left: 0;
-        justify-content: center;
+        flex-direction: column;
+        
+        button {
+          width: 100%;
+          justify-content: center;
+        }
       }
     }
     
