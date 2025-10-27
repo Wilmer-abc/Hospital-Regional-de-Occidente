@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators, FormsModule, FormGroup } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -7,6 +7,7 @@ import { TurnosService } from '../../services/turnos.service';
 import { CalendarioTurnosComponent } from '../calendario-turnos/calendario-turnos.component';
 import { EmpleadosService } from '../../services/empleados.service';
 import { RemplazoComponent } from '../reemplazo/remplazo.component';
+import { Subject, takeUntil } from 'rxjs';
 
 
 const API = environment.apiBase;
@@ -76,7 +77,9 @@ interface Asignacion {
   templateUrl: './asignar-turnos.component.html',
   styleUrls: ['./asignar-turnos.component.scss']
 })
-export class AsignarTurnosComponent implements OnInit {
+export class AsignarTurnosComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
+  private filtroTimeout: any;
 
   private empleadosService = inject(EmpleadosService);
 
@@ -199,21 +202,38 @@ export class AsignarTurnosComponent implements OnInit {
 
   // ===== Ciclo de vida =====
   ngOnInit(): void {
-    this.cargarCatalogos();
-    this.cargarTurnos();
+      this.cargarCatalogos();
+      this.cargarTurnos();
 
-        this.empleadosService.empleados$.subscribe(empleados => {
-      this.empleados = empleados.map(emp => ({
-        ...emp,
-        id: emp.id ?? 0, // Asigna 0 si id es undefined
-        empleado: emp.empleado ?? [],
-        length: emp.length ?? 0,
-        asignacionesPrevias: emp.asignacionesPrevias ?? undefined
-      }));
-      this.filtrarEmpleados(); // Re-filtrar cuando cambien los datos
-    });
-    
-  }
+      // CORREGIDO: Suscripción con manejo de desuscripción
+      this.empleadosService.empleados$
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(empleados => {
+          this.empleados = empleados.map(emp => ({
+            ...emp,
+            id: emp.id ?? 0,
+            empleado: emp.empleado ?? [],
+            length: emp.length ?? 0,
+            asignacionesPrevias: emp.asignacionesPrevias ?? undefined
+          }));
+          
+          // Solo filtrar cuando sea necesario
+          if (this.vista === 'FORMULARIO' && this.step === 2) {
+            setTimeout(() => this.filtrarEmpleados(), 100);
+          }
+        });
+    }
+
+
+      ngOnDestroy(): void {
+      this.destroy$.next();
+      this.destroy$.complete();
+      
+      // Limpiar timeouts
+      if (this.filtroTimeout) {
+        clearTimeout(this.filtroTimeout);
+      }
+    }
 
   cargarTurnos() {
     this.http.get<any>(`${API}/turnos`).subscribe({
@@ -693,18 +713,33 @@ export class AsignarTurnosComponent implements OnInit {
     this.reemplazoActivo = true;
   }
 
-  // MODIFICA el método cancelarFormulario para limpiar correctamente:
-  cancelarFormulario() {
-    // Limpiar equipo temporal sin afectar áreas
-    this.equipoCompleto = [];
+  // MODIFICA el método cancelarFormulario para diferenciar entre cancelar y retroceder
+    cancelarFormulario(esCancelacionTotal: boolean = true) {
+      if (esCancelacionTotal) {
+        // Cancelación total: regresar a la vista de lista
+        this.vista = this.modo === 'ROTATIVO' ? 'LISTA_ROTATIVOS' : 'LISTA_FIJOS';
+        this.editandoId = null;
+        this.step = 1;
+        this.error = null;
+        
+        // Limpiar equipo temporal sin afectar áreas
+        this.equipoCompleto = [];
+        
+        console.log('❌ Formulario cancelado - regresando a lista');
+      } else {
+        // Solo retroceder un paso (para el botón "Atrás")
+        this.prevStep();
+      }
+    }
+
+    // MODIFICA el método prevStep para mayor claridad
+    prevStep() {
+      if (this.step > 1) {
+        this.step--;
+        this.error = null; // limpiar errores al retroceder
+      }
+    }
     
-    this.vista = this.modo === 'ROTATIVO' ? 'LISTA_ROTATIVOS' : 'LISTA_FIJOS';
-    this.editandoId = null;
-    this.step = 1;
-    this.error = null;
-    
-    console.log('❌ Formulario cancelado - equipos temporales limpiados');
-  }
 
   nextStep() {
     // Paso 1: Validar área y jefe
@@ -757,31 +792,35 @@ export class AsignarTurnosComponent implements OnInit {
     }
   }
 
-
-  prevStep() {
-    if (this.step > 1) {
-      this.step--;
-    }
-  }
-
   // ===== Empleados =====
   filtrarEmpleados() {
-    let filtrados = this.empleados.filter(e => e.activo);
-
-    if (this.filtroBusqueda) {
-      const search = this.filtroBusqueda.toLowerCase();
-      filtrados = filtrados.filter(e => e.nombre_completo.toLowerCase().includes(search));
+    if (this.filtroTimeout) {
+      clearTimeout(this.filtroTimeout);
     }
+    
+    this.filtroTimeout = setTimeout(() => {
+      let filtrados = this.empleados.filter(e => e.activo);
 
-    if (this.filtroRol) {
-      filtrados = filtrados.filter(e => this.getTipoRolPorNombre(e.rol_id) === this.filtroRol);
-    } else {
-      filtrados = filtrados.filter(e =>
-        ['ENFERMERO', 'AUX_ENFERMERIA', 'AUX_HOSPITAL'].includes(this.getTipoRolPorNombre(e.rol_id))
-      );
-    }
+      if (this.filtroBusqueda) {
+        const search = this.filtroBusqueda.toLowerCase();
+        filtrados = filtrados.filter(e => 
+          e.nombre_completo.toLowerCase().includes(search)
+        );
+      }
 
-    this.empleadosFiltrados = filtrados;
+      if (this.filtroRol) {
+        filtrados = filtrados.filter(e => 
+          this.getTipoRolPorNombre(e.rol_id) === this.filtroRol
+        );
+      } else {
+        filtrados = filtrados.filter(e =>
+          ['ENFERMERO', 'AUX_ENFERMERIA', 'AUX_HOSPITAL']
+            .includes(this.getTipoRolPorNombre(e.rol_id))
+        );
+      }
+
+      this.empleadosFiltrados = filtrados;
+    }, 300);
   }
 
   toggleEmpleadoEquipo(empleado: Empleado) {
@@ -1287,8 +1326,38 @@ export class AsignarTurnosComponent implements OnInit {
       
       console.log('🔄 Formulario reseteado - equipos temporales limpiados');
     }
+
+    // ===== Funciones TrackBy para mejorar rendimiento =====
+  trackByEmpleadoId(index: number, empleado: any): number {
+    return empleado.id;
   }
 
-  function guardarTurnosFijos() {
-    throw new Error('Function not implemented.');
+  trackByTurnoId(index: number, turno: any): number {
+    return turno.id;
   }
+
+  trackByAreaId(index: number, area: any): number {
+    return area.id;
+  }
+  trackByConfigId(index: number, config: any): number {
+    return config.id || index;
+  }
+
+  trackByDiaSemana(index: number, dia: any): number {
+    return index;
+  }
+
+  trackByRolId(index: number, rol: any): number {
+    return rol.id || index;
+  }
+
+  trackByJefeId(index: number, jefe: any): number {
+    return jefe.id || index;
+  }
+
+  trackByAsignacionId(index: number, asignacion: any): number {
+    return asignacion.id || index;
+  }
+}
+
+ 
