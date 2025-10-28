@@ -1,11 +1,9 @@
-// backend/routes/biometric.routes.js
 const router = require('express').Router();
 const auth = require('../middlewares/auth');
 const svc = require('../services/biometric/hikvision.service.js');
 
 const { requireAuth, requireAdmin } = auth;
 
-// Todas las rutas requieren autenticación
 router.use(requireAuth);
 
 // =================== 🔌 PROBAR CONEXIÓN ===================
@@ -40,8 +38,7 @@ router.get('/events', requireAdmin, async (req, res) => {
 // ===================== SINCRONIZAR EMPLEADOS DESDE BIOMÉTRICOS =====================
 router.post('/sync-users', requireAdmin, async (_req, res) => {
   try {
-    const users = await svc.getAllUserNames(); // función que obtiene todos los empleados desde ambos biométricos
-
+    const users = await svc.getAllUserNames();
     for (const u of users) {
       await db.query(`
         INSERT INTO empleados (numero_empleado, nombre_completo, activo)
