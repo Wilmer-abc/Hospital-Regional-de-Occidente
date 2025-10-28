@@ -11,6 +11,7 @@ export interface Empleado {
   empleado: never[];
   id?: number;
   numero_empleado: string;
+  renglon?: string;
   nombre_completo: string;
   email: string;
   rol_id: number | null;
