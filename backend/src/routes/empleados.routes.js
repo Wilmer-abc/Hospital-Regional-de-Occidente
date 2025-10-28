@@ -38,32 +38,41 @@ class EmpleadosModel {
       return rows.length ? rows[0] : null;
     }
 
-    static async create({ numero_empleado, nombre_completo, email, rol_id, area_id, activo = 1 }) {
-      let normalizedAreaId = (area_id === '' || area_id === undefined || area_id === null || Number.isNaN(Number(area_id)))
-        ? null : Number(area_id);
+  static async create({ numero_empleado, renglon, nombre_completo, email, rol_id, area_id, activo = 1 }) {
+    let normalizedAreaId = (area_id === '' || area_id === undefined || area_id === null || Number.isNaN(Number(area_id)))
+      ? null : Number(area_id);
 
-      const [result] = await db.query(`
-        INSERT INTO empleados (numero_empleado, nombre_completo, email, rol_id, area_id, activo)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `, [numero_empleado, nombre_completo, email || null, rol_id, normalizedAreaId, activo]);
-      
-      return { 
-        id: result.insertId, numero_empleado, nombre_completo, email: email || null,
-        rol_id, area_id: normalizedAreaId, activo 
-      };
-    }
+    const [result] = await db.query(`
+      INSERT INTO empleados (numero_empleado, renglon, nombre_completo, email, rol_id, area_id, activo)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [numero_empleado, renglon || null, nombre_completo, email || null, rol_id, normalizedAreaId, activo]);
 
-    static async update(id, { nombre_completo, email, rol_id, area_id, activo }) {
-      let normalizedAreaId = (area_id === '' || area_id === undefined || area_id === null || Number.isNaN(Number(area_id)))
-        ? null : Number(area_id);
+    return { 
+      id: result.insertId, 
+      numero_empleado, 
+      renglon, 
+      nombre_completo, 
+      email: email || null,
+      rol_id, 
+      area_id: normalizedAreaId, 
+      activo 
+    };
+  }
 
-      const [result] = await db.query(`
-        UPDATE empleados SET nombre_completo=?, email=?, rol_id=?, area_id=?, activo=? WHERE id=?
-      `, [nombre_completo, email || null, rol_id, normalizedAreaId, activo, id]);
-      
-      if (result.affectedRows === 0) throw new Error('Empleado no encontrado');
-      return this.getById(id);
-    }
+  static async update(id, { nombre_completo, email, rol_id, area_id, activo, renglon }) {
+    let normalizedAreaId = (area_id === '' || area_id === undefined || area_id === null || Number.isNaN(Number(area_id)))
+      ? null : Number(area_id);
+
+    const [result] = await db.query(`
+      UPDATE empleados 
+      SET nombre_completo=?, email=?, rol_id=?, area_id=?, activo=?, renglon=? 
+      WHERE id=?
+    `, [nombre_completo, email || null, rol_id, normalizedAreaId, activo, renglon || null, id]);
+
+    if (result.affectedRows === 0) throw new Error('Empleado no encontrado');
+    return this.getById(id);
+  }
+
 
     static async softDelete(id) {
       const [result] = await db.query(`UPDATE empleados SET activo=0 WHERE id=?`, [id]);
@@ -91,8 +100,6 @@ class EmpleadosModel {
       `);
       return rows;
     }
-
-
   }
 
   //  CONTROLADOR
@@ -129,7 +136,7 @@ class EmpleadosModel {
 
     static async createEmpleado(req, res) {
       try {
-        const { numero_empleado, nombre_completo, email, rol_id, area_id, activo } = req.body;
+        const { numero_empleado, renglon, nombre_completo, email, rol_id, area_id, activo } = req.body;
         const required = [];
         if (!numero_empleado) required.push('numero_empleado');
         if (!nombre_completo) required.push('nombre_completo');
@@ -154,6 +161,7 @@ class EmpleadosModel {
 
         const nuevo = await EmpleadosModel.create({
           numero_empleado,
+          renglon,
           nombre_completo,
           email: email || null,
           rol_id: parseInt(rol_id, 10),
@@ -171,7 +179,7 @@ class EmpleadosModel {
     static async updateEmpleado(req, res) {
       try {
         const { id } = req.params;
-        const { nombre_completo, email, rol_id, area_id, activo } = req.body;
+        const { nombre_completo, email, rol_id, area_id, activo, renglon } = req.body;
         if (!id || isNaN(id)) return res.status(400).json({ success: false, error: 'ID invalido' });
 
         const existente = await EmpleadosModel.getById(parseInt(id, 10));
@@ -183,6 +191,7 @@ class EmpleadosModel {
           rol_id: parseInt(rol_id, 10),
           area_id,
           activo: activo !== undefined ? Boolean(activo) : existente.activo,
+          renglon
         });
 
         await audit({ evento: 'UPDATE', entidad: 'empleados', entidad_id: parseInt(id, 10), antes: existente, despues: actualizado, req });
