@@ -97,7 +97,7 @@
             <td [class.estado-presente]="r.salida_real" [class.estado-ausente]="!r.salida_real">
               {{ r.salida_real ? formatearHora(r.salida_real) : '--:--' }}
             </td>
-            <td [class]="getCumplimientoClass(r.cumplimiento)">{{ r.cumplimiento || 'N/A' }}</td>
+            <td [ngClass]="getCumplimientoClass(r.cumplimiento)">{{ r.cumplimiento || 'N/A' }}</td>
             <td [class]="getEstadoClass(r.estado_dia)">{{ r.estado_dia || 'N/A' }}</td>
           </tr>
         </tbody>
