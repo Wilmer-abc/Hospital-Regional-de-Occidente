@@ -140,19 +140,21 @@ export class ReportesComponent implements OnInit {
   }
 
   // MÉTODOS PARA LAS CLASES DINÁMICAS
-  getCumplimientoClass(cumplimiento: string): string {
-    if (!cumplimiento) return '';
-    
-    if (cumplimiento.includes('✅') || cumplimiento.includes('Cumple')) return 'estado-presente';
-    if (cumplimiento.includes('⚠️') || cumplimiento.includes('Retraso')) return 'estado-retraso';
-    if (cumplimiento.includes('❌') || cumplimiento.includes('Ausente')) return 'estado-ausente';
-    
+  getCumplimientoClass(valor: string): string {
+    if (!valor) return '';
+    const v = valor.toLowerCase();
+
+    if (v.includes('cumple')) return 'cumplimiento-exito';       
+    if (v.includes('retraso')) return 'cumplimiento-advertencia'; 
+    if (v.includes('ausente')) return 'cumplimiento-error';       
+    if (v.includes('no aplica')) return 'cumplimiento-exento';    
     return '';
   }
 
+
   getEstadoClass(estado: string): string {
     if (!estado) return '';
-    
+    if (estado.includes('No obligatorio')) return 'estado-exento';
     if (estado.includes('Presente')) return 'estado-presente';
     if (estado.includes('Ausente')) return 'estado-ausente';
     if (estado.includes('Retraso') || estado.includes('Tarde')) return 'estado-retraso';
