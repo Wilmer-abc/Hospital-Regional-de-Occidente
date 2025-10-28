@@ -34,6 +34,7 @@ router.get('/asistencia', requireAuth, async (req, res) => {
           jefe.nombre_completo AS jefe_area,
           e.nombre_completo AS empleado,
           re.nombre_rol AS cargo,
+          e.renglon,
           at.fecha_inicio AS fecha,
           t.nombre_turno AS turno_asignado,
           t.tipo_turno,
@@ -45,18 +46,30 @@ router.get('/asistencia', requireAuth, async (req, res) => {
           DATE_FORMAT(t.hora_fin, '%H:%i') AS hora_salida_programada,
           a.entrada_real,
           a.salida_real,
-          a.estado,
+
+          -- ESTADO AJUSTADO SEGÚN REGLÓN
           CASE 
-            WHEN a.estado = 'COMPLETO' THEN '✅ Cumple horario'
-            WHEN a.estado = 'TARDE' THEN '⚠️ Retraso'
-            WHEN a.estado = 'FALTA' THEN '❌ Ausente'
-            ELSE '❌ Ausente'
+            WHEN e.renglon IN ('182','189','186','183') THEN 'EXENTO'
+            ELSE a.estado
+          END AS estado,
+
+          -- CUMPLIMIENTO PERSONALIZADO
+          CASE 
+            WHEN e.renglon IN ('182','189','186','183') THEN ' No aplica marcaje'
+            WHEN a.estado = 'COMPLETO' THEN ' Cumple horario'
+            WHEN a.estado = 'TARDE' THEN ' Retraso'
+            WHEN a.estado = 'FALTA' OR a.id IS NULL THEN ' Ausente'
+            ELSE 'Ausente'
           END AS cumplimiento,
+
+          -- ESTADO DEL DÍA FINAL
           CASE 
+            WHEN e.renglon IN ('182','189','186','183') THEN 'Presente (No obligatorio)'
             WHEN a.estado IN ('COMPLETO','TARDE') THEN 'Presente'
             WHEN a.estado = 'FALTA' OR a.id IS NULL THEN 'Ausente'
             ELSE 'Ausente'
           END AS estado_dia
+
         FROM empleados e
         INNER JOIN areas ar ON ar.id = e.area_id
         INNER JOIN roles_empleado re ON re.id = e.rol_id
@@ -68,6 +81,7 @@ router.get('/asistencia', requireAuth, async (req, res) => {
         WHERE e.eliminado_en IS NULL
           AND e.activo = 1
           AND ar.id = ?
+          ${tipo_reporte === 'todo' ? '' : 'AND at.fecha_inicio BETWEEN ? AND ?'}
         ORDER BY e.nombre_completo, at.fecha_inicio;
       `;
       
@@ -94,10 +108,10 @@ router.get('/asistencia', requireAuth, async (req, res) => {
           a.salida_real,
           a.estado,
           CASE 
-            WHEN a.estado = 'COMPLETO' THEN '✅ Cumple horario'
-            WHEN a.estado = 'TARDE' THEN '⚠️ Retraso'
-            WHEN a.estado = 'FALTA' THEN '❌ Ausente'
-            ELSE '❌ Ausente'
+            WHEN a.estado = 'COMPLETO' THEN 'Cumple horario'
+            WHEN a.estado = 'TARDE' THEN 'Retraso'
+            WHEN a.estado = 'FALTA' THEN 'Ausente'
+            ELSE 'Ausente'
           END AS cumplimiento,
           CASE 
             WHEN a.estado IN ('COMPLETO','TARDE') THEN 'Presente'
