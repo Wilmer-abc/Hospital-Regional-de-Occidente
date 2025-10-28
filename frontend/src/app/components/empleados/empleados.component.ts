@@ -32,6 +32,7 @@ export class EmpleadosComponent implements OnInit {
   editingEmpleado: Empleado | null = null;
   empleadofrorm: Empleado = {
     numero_empleado: '',
+    renglon: '',
     nombre_completo: '',
     email: '',
     rol_id: 1,
