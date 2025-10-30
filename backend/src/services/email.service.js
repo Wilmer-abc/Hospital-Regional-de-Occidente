@@ -1,5 +1,6 @@
 // backend/src/services/email.service.js
 const nodemailer = require('nodemailer');
+const { crearPlantillaRenovacionAgrupada } = require('./emailTemplates');
 
 // 🔹 Configuración del transporte con variables de entorno
 const transporter = nodemailer.createTransport({
@@ -26,12 +27,39 @@ async function sendEmail(to, subject, html) {
       subject,
       html,
     });
-    console.log(`📧 Email enviado a ${to}`);
+    console.log(`Email enviado a ${to}`);
     return true;
   } catch (error) {
-    console.error("❌ Error enviando email:", error);
+    console.error("Error enviando email:", error);
     return false;
   }
 }
 
+async function enviarCorreosRenovacionAgrupada(empleadosTurnos, mesRenovado) {
+  // empleadosTurnos: [{ empleado, turnos: [{ fecha, turno, horario }] }]
+  for (const empleado of empleadosTurnos) {
+    const { email, nombre_completo } = empleado;
+    const turnos = empleado.turnos;
+
+    if (!email) continue;
+
+    const asunto = `📅 Renovación de turnos rotativos — ${mesRenovado}`;
+    const html = crearPlantillaRenovacionAgrupada(nombre_completo, turnos, mesRenovado);
+
+    try {
+      await transporter.sendMail({
+        from: 'Sistema de Asistencia <notificaciones@hospitaloccidente.gt>',
+        to: email,
+        subject: asunto,
+        html
+      });
+
+      console.log(`✅ Correo agrupado enviado a ${nombre_completo}`);
+    } catch (error) {
+      console.error(`❌ Error enviando correo agrupado a ${nombre_completo}:`, error);
+    }
+  }
+}
+
+module.exports = { enviarCorreosRenovacionAgrupada };
 module.exports = { sendEmail };
