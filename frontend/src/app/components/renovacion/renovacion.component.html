@@ -5,13 +5,12 @@
     <p>{{ empleadosCount }} empleados asignados</p>
   </div>
 
-    <button class="btn"
-            [disabled]="cargando"
-            (click)="renovarTurno($event)">
-    {{ cargando ? 'Procesando...' : '➡️ Seguir para el próximo mes' }}
-    </button>
+      <button class="btn" [disabled]="cargando" (click)="renovarTurno($event)">
+        {{ cargando ? 'Procesando...' : 'Seguir para el próximo mes' }}
+      </button>
 
+      <div *ngIf="mensaje" class="alert success">{{ mensaje }}</div>
+      <div *ngIf="error" class="alert error">{{ error }}</div>
+      <p style="font-size: 12px; color: gray;">Área ID: {{ areaId }}</p>
 
-  <div *ngIf="mensaje" class="alert success">{{ mensaje }}</div>
-  <div *ngIf="error" class="alert error">{{ error }}</div>
 </div>
