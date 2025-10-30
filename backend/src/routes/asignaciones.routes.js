@@ -867,8 +867,4 @@ const { sendEmail} = require('../services/email.service.js');
       }
     });
 
-
-
-
-
 module.exports = router;
