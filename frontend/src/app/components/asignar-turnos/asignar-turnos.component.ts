@@ -564,7 +564,7 @@ export class AsignarTurnosComponent implements OnInit, OnDestroy {
       }
     }
 
-    console.log('📋 Asignaciones totales del calendario:', this.asignacionesCalendario);
+    console.log('Asignaciones totales del calendario:', this.asignacionesCalendario);
   }
 
   //NUEVO MÉTODO: Limpiar asignaciones del calendario
@@ -656,7 +656,7 @@ export class AsignarTurnosComponent implements OnInit, OnDestroy {
           }
         },
         error: (err) => {
-          console.error(`❌ Error cargando asignaciones para ${empleado.nombre_completo}:`, err);
+          console.error(`Error cargando asignaciones para ${empleado.nombre_completo}:`, err);
         }
       });
     });
@@ -664,7 +664,7 @@ export class AsignarTurnosComponent implements OnInit, OnDestroy {
 
   //NUEVO MÉTODO: Actualizar el calendario cuando cambia el empleado seleccionado
   onEmpleadoCalendarioChange() {
-    console.log('👤 Empleado calendario cambiado:', this.empleadoCalendarioSeleccionado);
+    console.log('Empleado calendario cambiado:', this.empleadoCalendarioSeleccionado);
     
     if (this.empleadoCalendarioSeleccionado) {
       this.actualizarCalendarioConAsignacionesPrevias();
@@ -713,7 +713,6 @@ export class AsignarTurnosComponent implements OnInit, OnDestroy {
 
     this.reemplazoActivo = true;
   }
-
   // MODIFICA el método cancelarFormulario para diferenciar entre cancelar y retroceder
     cancelarFormulario(esCancelacionTotal: boolean = true) {
       if (esCancelacionTotal) {

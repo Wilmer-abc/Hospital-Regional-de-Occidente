@@ -767,6 +767,7 @@ const { sendEmail} = require('../services/email.service.js');
       }
     });
 
+
     // ========================= RENOVAR TURNOS ROTATIVOS (SIGUIENTE MES) =========================
     router.post('/renovar-rotativos', requireAuth, async (req, res) => {
       const { area_id, mes_actual, anio_actual } = req.body;
@@ -866,5 +867,6 @@ const { sendEmail} = require('../services/email.service.js');
         if (conn) conn.release();
       }
     });
+
 
 module.exports = router;

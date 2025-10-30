@@ -284,7 +284,4 @@ guardarTurnosFijos(payload: any) {
       );
     }
 
-  // Las funciones relacionadas con reemplazos (getEmpleadosDisponiblesParaReemplazo,
-  // solicitarReemplazo, confirmarReemplazo) ya están implementadas anteriormente en esta clase.
-
 }

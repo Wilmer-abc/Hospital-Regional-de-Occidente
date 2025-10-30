@@ -1,7 +1,7 @@
 se nesecitan instalar las dependencias en ambas carpetas
 cd backend = npm install == esto para instalar dependencias
 cd backend = npm install nodemailer == esto para el envio de correos
-
+cd backend = pm2 start server.js --name hospital_biometric  
 
 cd frontend = npm install
 cd frontend = npm install -g @angular/cli
