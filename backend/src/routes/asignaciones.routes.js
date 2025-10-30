@@ -766,86 +766,16 @@ const { sendEmail} = require('../services/email.service.js');
         });
       }
     });
-    
-    // ========================= RENOVAR LOTE DE ASIGNACIONES =========================  
-    router.post('/renovar-lote', requireAuth, async (req, res) => {
-      const { lote_id } = req.body;
-      if (!lote_id) {
-        return res.status(400).json({ success: false, message: 'Falta el ID del lote' });
-      }
 
-      let conn;
-      try {
-        conn = await db.getConnection();
-        await conn.beginTransaction();
+    // ========================= RENOVAR TURNOS ROTATIVOS (SIGUIENTE MES) =========================
+    router.post('/renovar-rotativos', requireAuth, async (req, res) => {
+      const { area_id, mes_actual, anio_actual } = req.body;
 
-        // Obtener datos del lote original
-        const [[lote]] = await conn.query(
-          `SELECT * FROM asignaciones_lote WHERE id = ?`, [lote_id]
-        );
-
-        if (!lote) {
-          return res.status(404).json({ success: false, message: 'Lote no encontrado' });
-        }
-
-        // Calcular fechas del próximo mes
-        const fechaInicio = new Date(lote.fecha_inicio);
-        const fechaFin = new Date(lote.fecha_fin);
-
-        const nuevoInicio = new Date(fechaInicio.getFullYear(), fechaInicio.getMonth() + 1, 1);
-        const nuevoFin = new Date(nuevoInicio.getFullYear(), nuevoInicio.getMonth() + 1, 0);
-
-        // Crear nuevo lote
-        const [nuevoLote] = await conn.query(`
-          INSERT INTO asignaciones_lote 
-          (area_id, jefe_id, turno_id, fecha_inicio, fecha_fin, patron, dias_descanso, creado_por)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-          lote.area_id, lote.jefe_id, lote.turno_id,
-          nuevoInicio, nuevoFin,
-          lote.patron, lote.dias_descanso, req.user?.id || null
-        ]);
-
-        const nuevoLoteId = nuevoLote.insertId;
-
-        // Obtener empleados asignados
-        const [asignaciones] = await conn.query(
-          `SELECT empleado_id, turno_id FROM asignacion_turnos WHERE lote_id = ?`,
-          [lote_id]
-        );
-
-        // Insertar nuevas asignaciones
-        for (const a of asignaciones) {
-          await conn.query(`
-            INSERT INTO asignacion_turnos (empleado_id, turno_id, fecha_inicio, fecha_fin, creado_por, lote_id)
-            VALUES (?, ?, ?, ?, ?, ?)
-          `, [a.empleado_id, a.turno_id, nuevoInicio, nuevoFin, req.user?.id || null, nuevoLoteId]);
-        }
-
-        await conn.commit();
-
-        // Enviar correos a empleados y jefe (puedes reutilizar plantilla)
-        // Similar al bloque de /bulk o /fijos
-
-        res.json({
-          success: true,
-          message: 'Lote renovado correctamente',
-          nuevo_lote_id: nuevoLoteId
+      if (!area_id || !mes_actual || !anio_actual) {
+        return res.status(400).json({
+          success: false,
+          message: 'Faltan parámetros: area_id, mes_actual, anio_actual son requeridos.'
         });
-
-      } catch (error) {
-        if (conn) await conn.rollback();
-        res.status(500).json({ success: false, message: error.message });
-      } finally {
-        if (conn) conn.release();
-      }
-    });
-
-    // ========================= RENOVAR LOTE DE ASIGNACIONES =========================
-    router.post('/renovar-lote', requireAuth, async (req, res) => {
-      const { lote_id } = req.body;
-      if (!lote_id) {
-        return res.status(400).json({ success: false, message: 'Falta el ID del lote' });
       }
 
       let conn;
@@ -853,151 +783,92 @@ const { sendEmail} = require('../services/email.service.js');
         conn = await db.getConnection();
         await conn.beginTransaction();
 
-        // 🔹 Obtener datos del lote original
-        const [[lote]] = await conn.query(`SELECT * FROM asignaciones_lote WHERE id = ?`, [lote_id]);
-        if (!lote) {
-          return res.status(404).json({ success: false, message: 'Lote no encontrado' });
-        }
+        console.log('🔁 Renovando turnos rotativos para área:', area_id, 'Mes:', mes_actual, 'Año:', anio_actual);
 
-        // 🔹 Calcular fechas del siguiente mes
-        const fechaInicio = new Date(lote.fecha_inicio);
-        const nuevoInicio = new Date(fechaInicio.getFullYear(), fechaInicio.getMonth() + 1, 1);
-        const nuevoFin = new Date(nuevoInicio.getFullYear(), nuevoInicio.getMonth() + 1, 0);
+        // 🔹 Calcular fechas del próximo mes
+        const nuevoMes = mes_actual == 12 ? 1 : mes_actual + 1;
+        const nuevoAnio = mes_actual == 12 ? anio_actual + 1 : anio_actual;
 
-        // 🔹 Crear nuevo lote
-        const [nuevoLote] = await conn.query(`
-          INSERT INTO asignaciones_lote 
-          (area_id, jefe_id, turno_id, fecha_inicio, fecha_fin, patron, dias_descanso, creado_por)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-          lote.area_id, lote.jefe_id, lote.turno_id,
-          nuevoInicio, nuevoFin,
-          lote.patron, lote.dias_descanso, req.user?.id || null
-        ]);
+        const fechaInicioNuevo = new Date(nuevoAnio, nuevoMes - 1, 1);
+        const fechaFinNuevo = new Date(nuevoAnio, nuevoMes, 0);
 
-        const nuevoLoteId = nuevoLote.insertId;
-
-        // 🔹 Obtener empleados del lote anterior
-        const [asignaciones] = await conn.query(
-          `SELECT empleado_id, turno_id FROM asignacion_turnos WHERE lote_id = ?`,
-          [lote_id]
-        );
+        // 🔹 Buscar asignaciones actuales de este mes y área
+        const [asignaciones] = await conn.query(`
+          SELECT a.empleado_id, a.turno_id, t.nombre_turno, t.hora_inicio, t.hora_fin
+          FROM asignacion_turnos a
+          JOIN turnos t ON a.turno_id = t.id
+          JOIN empleados e ON e.id = a.empleado_id
+          WHERE e.area_id = ?
+            AND MONTH(a.fecha_inicio) = ?
+            AND YEAR(a.fecha_inicio) = ?
+            AND t.tipo_turno = 'ROTATIVO'
+            AND a.eliminado_en IS NULL
+          GROUP BY a.empleado_id, a.turno_id
+        `, [area_id, mes_actual, anio_actual]);
 
         if (asignaciones.length === 0) {
-          return res.status(400).json({ success: false, message: 'No hay empleados asignados en el lote actual.' });
+          return res.status(404).json({
+            success: false,
+            message: 'No se encontraron turnos rotativos en el mes actual para esta área.'
+          });
         }
 
-        // 🔹 Insertar nuevas asignaciones para el nuevo mes
+        // 🔹 Crear nuevas asignaciones para el próximo mes
         for (const a of asignaciones) {
           await conn.query(`
-            INSERT INTO asignacion_turnos (empleado_id, turno_id, fecha_inicio, fecha_fin, creado_por, lote_id)
-            VALUES (?, ?, ?, ?, ?, ?)
-          `, [a.empleado_id, a.turno_id, nuevoInicio, nuevoFin, req.user?.id || null, nuevoLoteId]);
+            INSERT INTO asignacion_turnos (empleado_id, turno_id, fecha_inicio, fecha_fin, creado_por)
+            VALUES (?, ?, ?, ?, ?)
+          `, [a.empleado_id, a.turno_id, fechaInicioNuevo, fechaFinNuevo, req.user?.id || null]);
         }
 
         await conn.commit();
 
-        // Enviar correos a los empleados y jefe del área
-        const [[areaInfo]] = await db.query(`
-          SELECT a.nombre_area, e.nombre_completo AS jefe_nombre, e.email AS jefe_email
-          FROM areas a
-          LEFT JOIN empleados e ON e.id = ?
-          WHERE a.id = ?`,
-          [lote.jefe_id, lote.area_id]
-        );
+        console.log(`✅ Se generaron ${asignaciones.length} nuevas asignaciones rotativas para el mes ${nuevoMes}/${nuevoAnio}`);
 
-        const areaNombre = areaInfo?.nombre_area || 'Sin área';
-        const jefeNombre = areaInfo?.jefe_nombre || 'Sin jefe asignado';
-
-        const [empleados] = await db.query(`
-          SELECT e.id, e.nombre_completo, e.email, t.nombre_turno, t.hora_inicio, t.hora_fin
-          FROM asignacion_turnos a
-          JOIN empleados e ON e.id = a.empleado_id
-          JOIN turnos t ON t.id = a.turno_id
-          WHERE a.lote_id = ?`, [nuevoLoteId]
-        );
-
-        const resultadosCorreos = [];
-
-        for (const emp of empleados) {
-          try {
-            if (!emp.email) {
-              resultadosCorreos.push({ empleado_id: emp.id, correo: null, enviado: false, error: 'Sin correo' });
-              continue;
-            }
-
-            const htmlMensaje = `
-              <div style="font-family: Arial, sans-serif; color: #333; padding: 1rem;">
-                <h2 style="color:#2563eb;">Renovación automática de turno</h2>
-                <p>Estimado(a) <strong>${emp.nombre_completo}</strong>,</p>
-                <p>Tu turno ha sido renovado automáticamente para el mes siguiente con la misma configuración del mes actual.</p>
-
-                <table border="1" cellpadding="6" cellspacing="0" 
-                      style="border-collapse:collapse; margin-top:1rem; width:100%; font-size:0.95rem;">
-                  <thead style="background:#f3f4f6;">
-                    <tr>
-                      <th style="text-align:left;">Área</th>
-                      <th style="text-align:left;">Jefe</th>
-                      <th style="text-align:left;">Turno</th>
-                      <th style="text-align:left;">Horario</th>
-                      <th style="text-align:left;">Rango</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>${areaNombre}</td>
-                      <td>${jefeNombre}</td>
-                      <td>${emp.nombre_turno}</td>
-                      <td>${emp.hora_inicio} - ${emp.hora_fin}</td>
-                      <td>${nuevoInicio.toISOString().split('T')[0]} al ${nuevoFin.toISOString().split('T')[0]}</td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                <p style="margin-top:1rem;">Por favor, verifica tu horario y notifica cualquier incidencia a tu jefe inmediato.</p>
-                <hr style="margin-top:1rem;">
-                <small>Hospital Regional de Occidente<br>
-                Sistema de Gestión de Asistencia Biométrica</small>
-              </div>
-            `;
-
-            await sendEmail(
-              emp.email,
-              'Renovación de turno mensual - Hospital Regional de Occidente',
-              htmlMensaje
-            );
-
-            resultadosCorreos.push({ empleado_id: emp.id, correo: emp.email, enviado: true });
-
-          } catch (err) {
-            console.error(`Error enviando correo a ${emp.nombre_completo}:`, err.message);
-            resultadosCorreos.push({ empleado_id: emp.id, correo: emp.email, enviado: false, error: err.message });
-          }
-        }
-            // ======================================================
-        // Registrar evento en bitácora
-
+        // 🔹 Registrar evento en bitácora
         await db.query(`
           INSERT INTO audit_log (evento, entidad, entidad_id, actor_id, actor_username)
-          VALUES ('CREATE', 'renovacion_lote', ?, ?, ?)
-        `, [nuevoLoteId, req.user?.id || null, req.user?.preferred_username || 'sistema']);
+          VALUES ('CREATE', 'renovacion_rotativos', NULL, ?, ?)
+        `, [req.user?.id || null, req.user?.preferred_username || 'sistema']);
 
-        console.log(`Lote ${nuevoLoteId} renovado y correos enviados a ${resultadosCorreos.length} empleados.`);
+        // 🔹 Enviar correo a cada empleado
+        for (const a of asignaciones) {
+          try {
+            const [[emp]] = await db.query(`SELECT nombre_completo, email FROM empleados WHERE id = ?`, [a.empleado_id]);
+            if (emp?.email) {
+              const html = `
+                <div style="font-family: Arial, sans-serif; color: #333;">
+                  <h2>📅 Renovación de turno rotativo</h2>
+                  <p>Hola <strong>${emp.nombre_completo}</strong>,</p>
+                  <p>Tu turno <strong>${a.nombre_turno}</strong> se ha renovado automáticamente para el mes de 
+                  <strong>${nuevoMes}/${nuevoAnio}</strong>.</p>
+                  <p>Horario: ${a.hora_inicio} - ${a.hora_fin}</p>
+                  <hr><small>Hospital Regional de Occidente — Sistema de Asistencia</small>
+                </div>`;
+              await sendEmail(emp.email, '📅 Renovación de turnos rotativos', html);
+            }
+          } catch (err) {
+            console.warn('⚠️ No se pudo enviar correo a empleado', a.empleado_id, err.message);
+          }
+        }
 
         res.json({
           success: true,
-          message: `Lote renovado y correos enviados (${resultadosCorreos.length}).`,
-          nuevo_lote_id: nuevoLoteId,
-          resultadosCorreos
+          message: `Turnos rotativos renovados correctamente para ${nuevoMes}/${nuevoAnio}`,
+          total_asignaciones: asignaciones.length
         });
 
       } catch (error) {
         if (conn) await conn.rollback();
-        console.error('Error en /renovar-lote:', error);
+        console.error('❌ Error en /renovar-rotativos:', error);
         res.status(500).json({ success: false, message: error.message });
       } finally {
         if (conn) conn.release();
       }
     });
+
+
+
+
 
 module.exports = router;
