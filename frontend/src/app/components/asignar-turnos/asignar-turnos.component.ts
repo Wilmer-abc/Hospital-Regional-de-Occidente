@@ -7,6 +7,7 @@ import { TurnosService } from '../../services/turnos.service';
 import { CalendarioTurnosComponent } from '../calendario-turnos/calendario-turnos.component';
 import { EmpleadosService } from '../../services/empleados.service';
 import { RemplazoComponent } from '../reemplazo/remplazo.component';
+import { RenovacionComponent } from '../renovacion/renovacion.component';
 import { Subject, takeUntil } from 'rxjs';
 
 
@@ -73,7 +74,7 @@ interface Asignacion {
 @Component({
   selector: 'app-asignar-turnos',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, CalendarioTurnosComponent, RemplazoComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, CalendarioTurnosComponent, RemplazoComponent, RenovacionComponent],
   templateUrl: './asignar-turnos.component.html',
   styleUrls: ['./asignar-turnos.component.scss']
 })
