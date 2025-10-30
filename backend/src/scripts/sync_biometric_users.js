@@ -3,7 +3,6 @@ import DigestFetch from 'digest-fetch';
 import xml2js from 'xml2js';
 import db from '../db.js';
 
-// Verificar credenciales específicas para cada dispositivo
 const devices = [
   { ip: '192.168.0.45', user: 'admin.', pass: 'Hospital0.' },
   { ip: '192.168.0.46', user: 'admin', pass: 'Hospital0.' }
@@ -186,7 +185,7 @@ async function saveToDB(users) {
     }
     
     const unified = unify(results);
-    console.log(`🧩 Total unificados (sin duplicados): ${unified.length}`);
+    console.log(`Total unificados (sin duplicados): ${unified.length}`);
     
     if (unified.length > 0) {
       await saveToDB(unified);
