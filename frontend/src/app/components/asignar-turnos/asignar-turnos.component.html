@@ -63,6 +63,15 @@
           Turno Fijo
         </p>
         <small>Creado: {{ conf.fechaCreacion | date:'medium' }}</small>
+<app-renovacion
+  [loteId]="conf.id"
+  [fechaFin]="conf.fecha_fin"
+  [areaNombre]="conf.areaNombre"
+  [jefeNombre]="conf.jefeNombre"
+  [empleadosCount]="conf.empleadosCount"
+  [areaId]="conf.areaId"> <!-- 👈 ESTA LÍNEA NUEVA -->
+</app-renovacion>
+
       </div>
     </div>
 
