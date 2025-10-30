@@ -1,3 +1,37 @@
+// emailTemplates.js
+function crearPlantillaRenovacionAgrupada(nombreEmpleado, turnos, mes) {
+  const filasTurnos = turnos.map(t => `
+    <tr>
+      <td style="padding: 6px 10px; border: 1px solid #ddd;">${t.fecha}</td>
+      <td style="padding: 6px 10px; border: 1px solid #ddd;">${t.turno}</td>
+      <td style="padding: 6px 10px; border: 1px solid #ddd;">${t.horario}</td>
+    </tr>
+  `).join('');
+
+  return `
+    <div style="font-family: Arial, sans-serif; color: #333;">
+      <h3>📅 Renovación de turnos rotativos</h3>
+      <p>Hola <strong>${nombreEmpleado}</strong>,</p>
+      <p>Se han renovado automáticamente tus turnos para el mes de <strong>${mes}</strong>.</p>
+
+      <table style="border-collapse: collapse; width: 100%; margin-top: 10px;">
+        <thead>
+          <tr style="background: #f2f2f2;">
+            <th style="padding: 8px; border: 1px solid #ddd;">Fecha</th>
+            <th style="padding: 8px; border: 1px solid #ddd;">Turno</th>
+            <th style="padding: 8px; border: 1px solid #ddd;">Horario</th>
+          </tr>
+        </thead>
+        <tbody>${filasTurnos}</tbody>
+      </table>
+
+      <p style="margin-top: 15px;">
+        <em>Hospital Regional de Occidente — Sistema de Asistencia</em>
+      </p>
+    </div>
+  `;
+}
+
 function plantillaAsignacionNormal(emp, turno, asignacion, area = null, jefe = null) {
   return `
     <div style="font-family: Arial, sans-serif; color: #333; padding: 16px;">
@@ -42,6 +76,7 @@ function plantillaAsignacionReemplazo(emp, turno, asignacion, area = null, jefe 
 }
 
 module.exports = {
+  crearPlantillaRenovacionAgrupada,
   plantillaAsignacionNormal,
   plantillaAsignacionReemplazo
 };
